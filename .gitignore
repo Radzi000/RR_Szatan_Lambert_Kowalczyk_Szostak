@@ -1,13 +1,40 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
-build/
+*.py[cod]
+*$py.class
+*.egg-info/
 dist/
-wheels/
-*.egg-info
+build/
+*.egg
 
 # Virtual environments
-.venv
+.venv/
+venv/
 
-# data files
-*.csv
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing & linting
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Data cache (large files, downloaded at runtime)
+data_cache/
+
+# Outputs
+outputs/
+
+# Sphinx build
+docs/_build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
