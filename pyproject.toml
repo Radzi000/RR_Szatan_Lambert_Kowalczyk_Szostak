@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "intraday-momentum"
+version = "0.1.0"
+description = "Reproducible research: Quantitative Analysis of Intraday Momentum via Volatility Regimes, Trend Filtering, and Temporal Persistence"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Eryk Szatan"},
+    {name = "Kacper Rickie Lambert"},
+    {name = "Natalia Kowalczyk"},
+    {name = "Radosław Szostak"},
+]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "yfinance>=0.2.18",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=3.0",
+    "ruff>=0.4",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
+    "sphinx-autodoc-typehints>=2.0",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 99
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "D",    # pydocstyle
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "D100",  # missing docstring in public module (handled by __init__)
+    "D104",  # missing docstring in public package
+    "D203",  # no blank line before class docstring (conflicts with D211)
+    "D213",  # multi-line summary second line (conflicts with D212)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]
+"notebooks/*" = ["D", "E501"]
+"strategy_development/*" = ["D", "E501", "F", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=intraday_momentum --cov-report=term-missing"
+
+[tool.setuptools.packages.find]
+include = ["intraday_momentum*"]
