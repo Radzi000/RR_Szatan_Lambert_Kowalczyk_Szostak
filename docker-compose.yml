@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data_cache:/app/data_cache
+      - ./outputs:/app/outputs
+    environment:
+      - PYTHONPATH=/app
+    command: pytest --tb=short
+
+  backtest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./data_cache:/app/data_cache
+      - ./outputs:/app/outputs
+    environment:
+      - PYTHONPATH=/app
+    command: python -m intraday_momentum.backtest
+
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./docs/_build:/app/docs/_build
+    command: sphinx-build -b html docs docs/_build/html
