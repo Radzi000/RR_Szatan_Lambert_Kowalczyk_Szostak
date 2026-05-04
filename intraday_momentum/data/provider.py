@@ -79,7 +79,12 @@ class DataProvider:
         if not path.exists():
             return None
         logger.info("Loading bundled data from %s", path)
-        df = pd.read_csv(path, index_col=0, parse_dates=True)
+        df = pd.read_csv(
+            path,
+            index_col=0,
+            parse_dates=True,
+            compression="gzip" if str(path).endswith(".gz") else None,
+        )
         df.index.name = "Datetime"
         # Convert to US/Eastern if timezone-aware (UTC from yfinance)
         if df.index.tz is not None:
@@ -126,7 +131,11 @@ class DataProvider:
             indexed by ``DatetimeIndex``.
         """
         # 1. Try bundled data
-        bundled_map = {"5m": "spy_5m.csv", "1m": "spy_1m.csv", "2m": "spy_2m.csv"}
+        bundled_map = {
+            "5m": "spy_5m.csv",
+            "1m": "spy_1m_2017_2021.csv.gz",
+            "2m": "spy_2m.csv",
+        }
         bundled_file = bundled_map.get(interval)
         if bundled_file:
             df = self._load_bundled(bundled_file)
