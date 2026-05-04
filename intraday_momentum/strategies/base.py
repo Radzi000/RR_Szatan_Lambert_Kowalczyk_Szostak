@@ -107,6 +107,42 @@ class BaseStrategy(ABC):
             return 0.0
         return float(np.mean(moves[-self.lookback :]))
 
+    @staticmethod
+    def _is_market_open(hour: int, minute: int) -> bool:
+        """Check if this is the first bar of the trading day (9:30-9:31 ET).
+
+        Parameters
+        ----------
+        hour : int
+            Hour component of timestamp.
+        minute : int
+            Minute component of timestamp.
+
+        Returns
+        -------
+        bool
+            True if this is the opening bar.
+        """
+        return hour == 9 and minute <= 31
+
+    @staticmethod
+    def _is_market_close(hour: int, minute: int) -> bool:
+        """Check if we are near market close (15:58+ ET).
+
+        Parameters
+        ----------
+        hour : int
+            Hour component of timestamp.
+        minute : int
+            Minute component of timestamp.
+
+        Returns
+        -------
+        bool
+            True if within last 2 minutes of trading.
+        """
+        return hour == 15 and minute >= 58
+
     def _update_minute_stats(self, time_key: str, move: float) -> None:
         """Record an absolute move for a minute-of-day slot.
 

@@ -21,6 +21,8 @@ dependencies = [
     "yfinance>=0.2.18",
     "matplotlib>=3.7",
     "seaborn>=0.12",
+    "pyarrow>=14.0",
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]

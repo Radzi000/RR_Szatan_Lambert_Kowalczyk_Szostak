@@ -94,7 +94,7 @@ class Strategy2(BaseStrategy):
                     cumulative_vol += bar["Volume"]
                 vwap_val = cumulative_vp / cumulative_vol if cumulative_vol > 0 else current_price
 
-                if hour == 9 and minute == 31:
+                if self._is_market_open(hour, minute) and todays_open is None:
                     todays_open = bar["Open"]
 
                 if todays_open is None or yesterdays_close is None:
@@ -114,7 +114,7 @@ class Strategy2(BaseStrategy):
                 upper_bound = max(todays_open, yesterdays_close) * (1 + sigma)
                 lower_bound = min(todays_open, yesterdays_close) * (1 - sigma)
 
-                if hour == 15 and minute >= 58:
+                if self._is_market_close(hour, minute):
                     if position != 0:
                         signals.append(Signal(ts, 0, reason="EOD exit"))
                         position = 0
