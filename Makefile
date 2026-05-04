@@ -43,3 +43,13 @@ clean:  ## Remove build artifacts and caches
 	rm -rf *.egg-info
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+
+download-data:  ## Download fresh SPY data from Yahoo Finance
+	$(PYTHON) -c "\
+	import yfinance as yf; import pandas as pd; \
+	d=yf.download('SPY',start='2017-01-01',interval='1d',progress=False); \
+	d.columns=d.columns.get_level_values(0) if isinstance(d.columns,pd.MultiIndex) else d.columns; \
+	d.to_csv('data/spy_daily.csv'); print(f'Daily: {len(d)} rows'); \
+	m=yf.download('SPY',period='60d',interval='5m',progress=False); \
+	m.columns=m.columns.get_level_values(0) if isinstance(m.columns,pd.MultiIndex) else m.columns; \
+	m.to_csv('data/spy_5m.csv'); print(f'5min: {len(m)} rows')"
