@@ -7,3 +7,4 @@ API Reference
    strategies
    backtest
    data
+   optimization
