@@ -8,3 +8,4 @@ API Reference
    backtest
    data
    optimization
+   visualization
