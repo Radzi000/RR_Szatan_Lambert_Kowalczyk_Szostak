@@ -115,7 +115,7 @@ PARAM_SPACES: dict[str, ParamSpace] = {
             ParamBound("lookback", 5, 30, 14, is_int=True),
             ParamBound("vol_target", 0.005, 0.05, 0.02),
             ParamBound("entry_interval", 10, 60, 30, is_int=True),
-            ParamBound("ema_window", 5, 50, 20, is_int=True),
+            ParamBound("exit_interval", 1, 30, 5, is_int=True),
         ],
     ),
     "Strategy2": ParamSpace(
@@ -124,6 +124,7 @@ PARAM_SPACES: dict[str, ParamSpace] = {
             ParamBound("lookback", 5, 30, 14, is_int=True),
             ParamBound("vol_target", 0.005, 0.05, 0.02),
             ParamBound("entry_interval", 10, 60, 30, is_int=True),
+            ParamBound("ema_period", 20, 200, 100, is_int=True),
         ],
     ),
     "Strategy3": ParamSpace(
@@ -132,7 +133,8 @@ PARAM_SPACES: dict[str, ParamSpace] = {
             ParamBound("lookback", 5, 30, 14, is_int=True),
             ParamBound("vol_target", 0.005, 0.05, 0.02),
             ParamBound("entry_interval", 10, 60, 30, is_int=True),
-            ParamBound("ema_window", 5, 50, 20, is_int=True),
+            ParamBound("exit_interval", 1, 30, 5, is_int=True),
+            ParamBound("exit_confirmation_bars", 1, 10, 4, is_int=True),
         ],
     ),
     "Strategy4": ParamSpace(
@@ -141,7 +143,9 @@ PARAM_SPACES: dict[str, ParamSpace] = {
             ParamBound("lookback", 5, 30, 14, is_int=True),
             ParamBound("vol_target", 0.005, 0.05, 0.02),
             ParamBound("entry_interval", 10, 60, 30, is_int=True),
-            ParamBound("ema_window", 5, 50, 20, is_int=True),
+            ParamBound("exit_interval", 1, 30, 5, is_int=True),
+            ParamBound("exit_confirmation_bars", 1, 10, 4, is_int=True),
+            ParamBound("ema_period", 20, 200, 100, is_int=True),
         ],
     ),
 }
