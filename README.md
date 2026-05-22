@@ -15,7 +15,7 @@ reproducibility.
 ## Team
 
 - **Eryk Szatan**
-- **Kacper Rickie Lambert**
+- **Kacper Lambert**
 - **Natalia Kowalczyk**
 - **Radosław Szostak**
 
