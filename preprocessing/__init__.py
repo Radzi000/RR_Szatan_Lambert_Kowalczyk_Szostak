@@ -1,6 +1,12 @@
-"""Deterministic preprocessing utilities for committed research data."""
+"""Deterministic preprocessing utilities for committed research data.
+
+Provides data discovery, schema validation, global time-based splitting,
+unified CSV export, and a :class:`DataSplitter` for partitioning
+DataFrames into train/validation/test sets without data leakage.
+"""
 
 from .validate_schema import normalize_ohlcv_frame, validate_ohlcv_schema
+
 
 def build_data_manifest(*args, **kwargs):
     """Lazily dispatch to the data-manifest builder."""
@@ -23,10 +29,18 @@ def discover_data_files(*args, **kwargs):
     return _discover_data_files(*args, **kwargs)
 
 
+def export_unified_csvs(*args, **kwargs):
+    """Lazily dispatch to the unified CSV exporter."""
+    from .export_unified import export_unified_csvs as _export
+
+    return _export(*args, **kwargs)
+
+
 __all__ = [
     "build_data_manifest",
     "build_global_split_manifest",
     "discover_data_files",
+    "export_unified_csvs",
     "normalize_ohlcv_frame",
     "validate_ohlcv_schema",
 ]
