@@ -1,4 +1,4 @@
-.PHONY: help install dev lint format test reproduce docs docker-build docker-test docker-reproduce clean
+.PHONY: help install dev lint format test data-manifest splits preprocess reproduce docker-build docker-test docker-reproduce clean
 
 PYTHON ?= python
 PIP ?= pip
@@ -15,20 +15,27 @@ dev:  ## Install project with dev dependencies and pre-commit hooks
 	pre-commit install
 
 lint:  ## Run ruff linter
-	ruff check intraday_momentum/ tests/
+	ruff check strategy_development/local_implementation/ preprocessing/ tests/
 
 format:  ## Auto-format code with ruff
-	ruff format intraday_momentum/ tests/
-	ruff check --fix intraday_momentum/ tests/
+	ruff format strategy_development/local_implementation/ preprocessing/ tests/
+	ruff check --fix strategy_development/local_implementation/ preprocessing/ tests/
 
 test:  ## Run the offline pytest suite
 	pytest
 
-reproduce:  ## Run the deterministic research pipeline locally
-	$(PYTHON) -m intraday_momentum.reproduce
+data-manifest:  ## Build a deterministic manifest for committed raw data
+	$(PYTHON) -m preprocessing.build_data_manifest
 
-docs:  ## Build Sphinx HTML documentation
-	sphinx-build -b html docs docs/_build/html
+splits:  ## Build deterministic global train/validation/test split boundaries
+	$(PYTHON) -m preprocessing.make_global_splits
+
+preprocess:  ## Run deterministic preprocessing foundation steps
+	$(MAKE) data-manifest
+	$(MAKE) splits
+
+reproduce:  ## Run the deterministic research pipeline locally
+	$(PYTHON) -m strategy_development.local_implementation.reproduce
 
 docker-build:  ## Build the Docker image
 	docker build -t intraday-momentum-repro .
@@ -46,7 +53,7 @@ root = Path('.'); \
 [shutil.rmtree(path, ignore_errors=True) for path in root.glob('*.egg-info')]; \
 [shutil.rmtree(path, ignore_errors=True) for path in root.rglob('__pycache__') if path.is_dir()]; \
 [path.unlink() for path in root.rglob('*.pyc') if path.is_file()]; \
-outputs = [root / 'outputs', root / 'outputs' / 'tables', root / 'outputs' / 'figures', root / 'outputs' / 'report']; \
+outputs = [root / 'outputs', root / 'outputs' / 'tables', root / 'outputs' / 'figures', root / 'outputs' / 'report', root / 'outputs' / 'manifests']; \
 [path.mkdir(parents=True, exist_ok=True) for path in outputs]; \
 [shutil.rmtree(path, ignore_errors=True) or path.mkdir(parents=True, exist_ok=True) for path in outputs[1:]]; \
 [(path / '.gitkeep').touch() for path in outputs]"

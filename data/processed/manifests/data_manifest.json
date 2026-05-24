@@ -1,0 +1,482 @@
+{
+  "data_root": "data",
+  "asset_count": 17,
+  "assets": [
+    {
+      "asset": "SPY",
+      "asset_class": "equities",
+      "frequency": "1day",
+      "source_file": "data/1day/spy_daily.csv",
+      "rows": 2345,
+      "timestamp_min": "2017-01-03 00:00:00+00:00",
+      "timestamp_max": "2026-05-01 00:00:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "3177a7a89ad32d4586725f9b646f6486e568bfcf274ced8635ced4116b8274a7",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "SPY",
+      "asset_class": "equities",
+      "frequency": "5min",
+      "source_file": "data/5min/spy_5m.csv",
+      "rows": 4612,
+      "timestamp_min": "2026-02-06 14:30:00+00:00",
+      "timestamp_max": "2026-05-04 14:15:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "f1958c80bab18717f3796459e5915caadf59ce3e316b594c2088ccec80c1b173",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "DBC",
+      "asset_class": "commodities",
+      "frequency": "15min",
+      "source_file": "data/15min/commodities/COMMODITIES_DBC_15m.csv",
+      "rows": 65163,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "31cafb86bf6de2982794e188417c14cf7683b11b3d1566337305c50d28934feb",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "GLD",
+      "asset_class": "commodities",
+      "frequency": "15min",
+      "source_file": "data/15min/commodities/COMMODITIES_GLD_15m.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "dcdc4c7d178f6e01d9f473ffbea2296afe83c4ee621561fc315af5077a212504",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "SLV",
+      "asset_class": "commodities",
+      "frequency": "15min",
+      "source_file": "data/15min/commodities/COMMODITIES_SLV_15m.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "37fd4e4ebe52ec4655c83b36d31520814f6115877789dbc590bd89f12a860487",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "USO",
+      "asset_class": "commodities",
+      "frequency": "15min",
+      "source_file": "data/15min/commodities/COMMODITIES_USO_15m.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "9d4b6ed890fa14dce8fc2b16f2b9a0e870027e06a6f1c09e4c0ce87fec976563",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "BNBUSDT",
+      "asset_class": "crypto",
+      "frequency": "15min",
+      "source_file": "data/15min/crypto/BNBUSDT.csv",
+      "rows": 290786,
+      "timestamp_min": "2017-11-06 03:45:00+00:00",
+      "timestamp_max": "2026-02-26 18:30:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "29f0adf3c41e05e40ef951d7343501c08272b2e6ade828af8d3c9fcde9532aba",
+      "session_profile": {
+        "timezone": "UTC",
+        "session_type": "continuous_24_7_adapted",
+        "session_open": null,
+        "session_close": null
+      }
+    },
+    {
+      "asset": "BTCUSDT",
+      "asset_class": "crypto",
+      "frequency": "15min",
+      "source_file": "data/15min/crypto/BTCUSDT.csv",
+      "rows": 298533,
+      "timestamp_min": "2017-08-17 04:00:00+00:00",
+      "timestamp_max": "2026-02-26 18:15:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "55b08c8166a2dbddbeaa2ad617dcf52d84e3c7d97af7ac74417d900c7c6c8889",
+      "session_profile": {
+        "timezone": "UTC",
+        "session_type": "continuous_24_7_adapted",
+        "session_open": null,
+        "session_close": null
+      }
+    },
+    {
+      "asset": "ETHUSDT",
+      "asset_class": "crypto",
+      "frequency": "15min",
+      "source_file": "data/15min/crypto/ETHUSDT.csv",
+      "rows": 298534,
+      "timestamp_min": "2017-08-17 04:00:00+00:00",
+      "timestamp_max": "2026-02-26 18:30:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "c667b49467598c12a40627fda102cd3a3d63e9b94c73086cf552933bb8b10244",
+      "session_profile": {
+        "timezone": "UTC",
+        "session_type": "continuous_24_7_adapted",
+        "session_open": null,
+        "session_close": null
+      }
+    },
+    {
+      "asset": "SOLUSDT",
+      "asset_class": "crypto",
+      "frequency": "15min",
+      "source_file": "data/15min/crypto/SOLUSDT.csv",
+      "rows": 194357,
+      "timestamp_min": "2020-08-11 06:00:00+00:00",
+      "timestamp_max": "2026-02-26 18:30:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "86a7466d39a449038f32a9364c26128e096d6e26b1a06640211005fb7c7b14cb",
+      "session_profile": {
+        "timezone": "UTC",
+        "session_type": "continuous_24_7_adapted",
+        "session_open": null,
+        "session_close": null
+      }
+    },
+    {
+      "asset": "AAPL",
+      "asset_class": "equities",
+      "frequency": "15min",
+      "source_file": "data/15min/equities/AAPL_15mins_2016-02-26_2026-03-01.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "8f02e461ae03a5a108bd4b155f76dd6e5420e2a1460371c3faffda19745f2d76",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "AMZN",
+      "asset_class": "equities",
+      "frequency": "15min",
+      "source_file": "data/15min/equities/AMZN_15mins_2016-02-26_2026-03-01.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "c21f84e87051d11bac93ebb5fa4fa6cbeb450f7d9a2e80cdad59901c27011bc0",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "GOOGL",
+      "asset_class": "equities",
+      "frequency": "15min",
+      "source_file": "data/15min/equities/GOOGL_15mins_2016-02-26_2026-03-01.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "21bacae3ce4763ccd5ba8d0f23e89a535b716b84542ec4fd0706fd2f8c1b8f85",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "META",
+      "asset_class": "equities",
+      "frequency": "15min",
+      "source_file": "data/15min/equities/META_15mins_2016-02-26_2026-03-01.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "8b1d78641bf455e4beef19dd19ca2d85c7d2b6ed01dd69521a3a67be0ed3ac6b",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "MSFT",
+      "asset_class": "equities",
+      "frequency": "15min",
+      "source_file": "data/15min/equities/MSFT_15mins_2016-02-26_2026-03-01.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "d0bcc43a56e5607cf961d6ccabd02eeaa08d53a7e751db208d0bcfb3e327cdd3",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "NVDA",
+      "asset_class": "equities",
+      "frequency": "15min",
+      "source_file": "data/15min/equities/NVDA_15mins_2016-02-26_2026-03-01.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "98d99c161770bc4ddfef4d48b5758187eba7b718a10d9d7cc4a717c0c978c932",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    },
+    {
+      "asset": "TSLA",
+      "asset_class": "equities",
+      "frequency": "15min",
+      "source_file": "data/15min/equities/TSLA_15mins_2016-02-26_2026-03-01.csv",
+      "rows": 65164,
+      "timestamp_min": "2016-02-26 14:30:00+00:00",
+      "timestamp_max": "2026-02-27 20:45:00+00:00",
+      "columns": [
+        "timestamp",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "asset",
+        "asset_class",
+        "frequency",
+        "source_file"
+      ],
+      "sha256": "3cedb808aaee97402e224fdee22c9f7365159d5ab17629d76564e80b048996c1",
+      "session_profile": {
+        "timezone": "US/Eastern",
+        "session_type": "regular_us_session",
+        "session_open": "09:30",
+        "session_close": "16:00"
+      }
+    }
+  ]
+}

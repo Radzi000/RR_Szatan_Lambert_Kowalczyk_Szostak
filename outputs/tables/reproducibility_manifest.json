@@ -1,15 +1,15 @@
 {
-  "python_version": "3.11.15",
+  "python_version": "3.13.7",
   "package_versions": {
-    "intraday-momentum": "0.1.0",
-    "numpy": "2.4.6",
-    "pandas": "3.0.3",
-    "matplotlib": "3.10.9",
+    "intraday-momentum": "not-installed",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "matplotlib": "3.10.6",
     "seaborn": "0.13.2",
-    "yfinance": "1.4.0"
+    "yfinance": "1.2.0"
   },
-  "git_commit_hash": null,
-  "run_command": "python -m intraday_momentum.reproduce",
+  "git_commit_hash": "13df098da4b1993a82862d493c12d77cb502101f",
+  "run_command": "python -m strategy_development.local_implementation.reproduce",
   "data_files": [
     {
       "path": "data/1day/spy_daily.csv",
@@ -46,7 +46,7 @@
     "outputs/tables/strategy_summary.md"
   ],
   "environment": {
-    "cwd": "/app",
+    "cwd": "C:\\Users\\Rados\\RR",
     "docker_offline_runtime_ready": true,
     "internet_required_at_runtime": false,
     "seed": 0,

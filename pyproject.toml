@@ -34,9 +34,6 @@ dev = [
     "ruff>=0.4",
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "sphinx>=7.0",
-    "sphinx-rtd-theme>=2.0",
-    "sphinx-autodoc-typehints>=2.0",
 ]
 
 [tool.ruff]
@@ -63,12 +60,11 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
-"notebooks/*" = ["D", "E501"]
-"strategy_development/*" = ["D", "E501", "F", "W"]
+"strategy_development/taken_strategies/*" = ["D", "E501", "F", "W"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--tb=short"
 
 [tool.setuptools.packages.find]
-include = ["intraday_momentum*"]
+include = ["strategy_development*", "preprocessing*", "trade_dependency*", "final_portfolio*", "intraday_momentum*"]

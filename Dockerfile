@@ -22,4 +22,4 @@ COPY . .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -e ".[dev]"
 
-CMD ["python", "-m", "intraday_momentum.reproduce"]
+CMD ["python", "-m", "strategy_development.local_implementation.reproduce"]

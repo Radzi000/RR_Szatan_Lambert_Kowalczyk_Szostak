@@ -1,9 +1,5 @@
-"""Intraday Momentum Strategy Framework.
+"""Compatibility wrapper for the moved local implementation package."""
 
-A reproducible research framework for quantitative analysis of intraday
-momentum strategies via volatility regimes, trend filtering, and temporal
-persistence. Based on the blackswan-quants/intraday-momentum project,
-adapted for local execution.
-"""
+from strategy_development.local_implementation import __version__
 
-__version__ = "0.1.0"
+__all__ = ["__version__"]

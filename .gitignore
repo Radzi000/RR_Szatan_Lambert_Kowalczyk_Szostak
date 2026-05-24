@@ -19,9 +19,11 @@ venv/
 
 # Testing & linting
 .pytest_cache/
+.mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
+.ipynb_checkpoints/
 
 # Data cache (large files, downloaded at runtime)
 data_cache/
@@ -35,6 +37,8 @@ outputs/*
 !outputs/figures/.gitkeep
 !outputs/report/
 !outputs/report/.gitkeep
+!outputs/manifests/
+!outputs/manifests/.gitkeep
 
 # Sphinx build
 docs/_build/

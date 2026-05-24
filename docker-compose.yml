@@ -6,7 +6,7 @@ services:
     image: intraday-momentum-repro
     volumes:
       - ./outputs:/app/outputs
-    command: python -m intraday_momentum.reproduce
+    command: python -m strategy_development.local_implementation.reproduce
 
   test:
     build:
@@ -14,15 +14,6 @@ services:
       dockerfile: Dockerfile
     image: intraday-momentum-repro
     command: pytest
-
-  docs:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: intraday-momentum-repro
-    volumes:
-      - ./docs/_build:/app/docs/_build
-    command: sphinx-build -b html docs docs/_build/html
 
   shell:
     build:

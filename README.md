@@ -1,10 +1,10 @@
 # Intraday Momentum Reproduction And Extension
 
 This repository is a course project for **Reproducible Research 2026** at the
-University of Warsaw (Jan Kozubowski). It reproduces and extends the intraday
-momentum strategies from the upstream project
+University of Warsaw (Jan Kozubowski). It reproduces and extends five
+QuantConnect-style intraday momentum strategies from the upstream project
 [`blackswan-quants/intraday-momentum`](https://github.com/blackswan-quants/intraday-momentum)
-with a deterministic local backtesting workflow.
+with a fully local, deterministic, Dockerized workflow.
 
 ## Research Question
 
@@ -22,11 +22,48 @@ Do simple intraday momentum rules on SPY remain competitive when extended with:
 - Natalia Kowalczyk
 - Radoslaw Szostak
 
+## Project Story
+
+The repository is organized around one research pipeline:
+
+```text
+data
+-> preprocessing
+-> strategy_development
+-> trade_dependency
+-> final_portfolio
+-> outputs
+```
+
+Within that pipeline:
+
+- the original downloaded QuantConnect-style strategies are preserved as
+  reference-only artifacts under `strategy_development/taken_strategies/`,
+- the authoritative local implementation lives under
+  `strategy_development/local_implementation/`,
+- the local Docker pipeline is the only execution path required for grading.
+
 ## Upstream Project Reproduced
 
 - Original reference: `blackswan-quants/intraday-momentum`
-- This repository ports the strategy logic into an offline local Python workflow
-  and compares five strategy variants on committed SPY data.
+- Original downloaded QuantConnect-style strategy files are preserved under
+  `strategy_development/taken_strategies/`.
+- The authoritative local implementation lives in
+  `strategy_development/local_implementation/`.
+
+## QuantConnect Status
+
+QuantConnect is treated as a **source/reference format only**.
+
+This repository does **not** depend on:
+
+- QuantConnect cloud,
+- QuantConnect APIs,
+- Lean CLI,
+- a QuantConnect account,
+- public QuantConnect backtests at runtime.
+
+The local Docker pipeline is authoritative for grading and reproducibility.
 
 ## One-Command Reproduction
 
@@ -39,9 +76,10 @@ docker compose up --build reproduce
 This is the primary grading workflow. It:
 
 - builds the Docker image,
-- runs `python -m intraday_momentum.reproduce`,
+- runs `python -m strategy_development.local_implementation.reproduce`,
 - uses committed data only,
 - generates deterministic outputs under `outputs/`,
+- does not require QuantConnect,
 - requires no notebooks and no local Python installation.
 
 ## Expected Outputs
@@ -66,17 +104,18 @@ After a successful run, the repository writes:
 ## Repository Structure
 
 ```text
-intraday_momentum/       Python package with data loading, strategies, backtest engine, plots, and reproduce entry point
-data/                    Committed bundled data used by the grading workflow
-outputs/                 Stable generated artifacts
-tests/                   Offline smoke tests for reproducibility
-docs/                    Sphinx documentation
-notebooks/               Exploratory notebooks, not required for grading
-strategy_development/    Reference strategy code snapshots
-Dockerfile               Docker image definition
-docker-compose.yml       Reproduction and test services
-Makefile                 Local and Docker convenience targets
-AI_USAGE.md              AI disclosure statement
+data/                               Committed baseline and extension datasets
+preprocessing/                      Deterministic data manifest, validation, and split helpers
+strategy_development/               Original reference strategies plus local implementation
+trade_dependency/                   Future research area for dependency analysis
+final_portfolio/                    Future research area for portfolio construction
+outputs/                            Generated reproducible artifacts
+tests/                              Offline smoke tests
+docs/                               Useful project documentation
+Dockerfile                          Docker image definition
+docker-compose.yml                  Canonical reproducible services
+Makefile                            Convenience commands
+AI_USAGE.md                         AI disclosure statement
 ```
 
 ## Data
@@ -91,6 +130,20 @@ The final reproducible pipeline uses committed repository data only.
   Source: Yahoo Finance SPY 5-minute OHLCV export.
   Date range: 2026-02-06 14:30:00+00:00 to 2026-05-04 14:15:00+00:00.
 
+- `data/15min/equities/`
+  Committed 15-minute equity data used for the broader research extension.
+
+- `data/15min/commodities/`
+  Committed 15-minute commodity ETF proxy data used for the broader research
+  extension.
+
+- `data/15min/crypto/`
+  Committed 15-minute crypto data used for the broader research extension.
+
+- `5m SPY` is the faithful local reproduction baseline.
+- `15m` is the intended main research extension frequency.
+- `30m` data is not required for this repository.
+
 - No manual download is required.
 - No internet is needed in reproduce mode.
 - The pipeline does not depend on Google Drive, Kaggle, or live `yfinance`.
@@ -102,12 +155,18 @@ Additional details are documented in [data/README.md](/C:/Users/Rados/RR/data/RE
 ```bash
 make dev
 make test
+make data-manifest
+make splits
+make preprocess
 make reproduce
 ```
 
 Main targets:
 
-- `make reproduce` runs `python -m intraday_momentum.reproduce`
+- `make data-manifest` builds a deterministic raw-data manifest
+- `make splits` computes deterministic global split boundaries for the 15-minute extension layer
+- `make preprocess` runs both preprocessing steps
+- `make reproduce` runs `python -m strategy_development.local_implementation.reproduce`
 - `make test` runs the offline pytest suite
 - `make docker-reproduce` runs `docker compose up --build reproduce`
 - `make docker-test` runs pytest inside Docker
@@ -133,7 +192,8 @@ pull target. At the moment, the repository build is the canonical workflow.
 ## Reproducibility Checklist
 
 - committed input data in the repository
-- deterministic CLI pipeline in `python -m intraday_momentum.reproduce`
+- deterministic preprocessing utilities in `preprocessing/`
+- deterministic CLI pipeline in `python -m strategy_development.local_implementation.reproduce`
 - Docker environment for grading
 - fixed strategy parameters
 - stable output filenames under `outputs/`
@@ -147,16 +207,17 @@ AI usage is disclosed in [AI_USAGE.md](/C:/Users/Rados/RR/AI_USAGE.md).
 
 - `blackswan-quants/intraday-momentum`, upstream strategy reference:
   https://github.com/blackswan-quants/intraday-momentum
-- Yahoo Finance SPY OHLCV data, used for the committed daily and 5-minute files.
+- Yahoo Finance and other committed local OHLCV exports used for the data files
+  stored in `data/`.
 
 ## Known Limitations
 
 - The final grading workflow is based on the committed 5-minute SPY file rather
-  than a longer 2-minute research dataset.
-- Intraday history is limited to the committed file range, so the project favors
-  deterministic reproducibility over broader data coverage.
-- Exploratory notebooks remain in the repository for transparency, but they are
-  not required by the grading workflow.
+  than a larger intraday baseline.
+- The broader 15-minute cross-asset extension is not yet the canonical Docker
+  reproduce workflow.
+- Intraday history is limited to the committed files, so the project favors
+  deterministic reproducibility over unrestricted data coverage.
 
 ## Acknowledgment Guidance
 

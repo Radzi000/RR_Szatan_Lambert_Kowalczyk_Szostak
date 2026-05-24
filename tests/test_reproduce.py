@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from intraday_momentum.data.provider import DataProvider
-from intraday_momentum.reproduce import DATA_ROOT, run_reproduction
+from strategy_development.local_implementation.data.provider import DataProvider
+from strategy_development.local_implementation.reproduce import DATA_ROOT, run_reproduction
 
 
 def test_package_imports_and_data_files_exist() -> None:
@@ -50,5 +50,5 @@ def test_reproduction_pipeline_generates_stable_outputs(tmp_path: Path) -> None:
     ]
 
     manifest = json.loads((tmp_path / "tables" / "reproducibility_manifest.json").read_text())
-    assert manifest["run_command"] == "python -m intraday_momentum.reproduce"
+    assert manifest["run_command"] == "python -m strategy_development.local_implementation.reproduce"
     assert manifest["environment"]["internet_required_at_runtime"] is False
