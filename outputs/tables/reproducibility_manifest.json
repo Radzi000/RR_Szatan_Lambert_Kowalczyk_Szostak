@@ -1,0 +1,56 @@
+{
+  "python_version": "3.11.15",
+  "package_versions": {
+    "intraday-momentum": "0.1.0",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "matplotlib": "3.10.9",
+    "seaborn": "0.13.2",
+    "yfinance": "1.4.0"
+  },
+  "git_commit_hash": null,
+  "run_command": "python -m intraday_momentum.reproduce",
+  "data_files": [
+    {
+      "path": "data/1day/spy_daily.csv",
+      "rows": 100,
+      "date_range": [
+        "2025-12-08",
+        "2026-05-01"
+      ],
+      "sha256": "3177a7a89ad32d4586725f9b646f6486e568bfcf274ced8635ced4116b8274a7"
+    },
+    {
+      "path": "data/5min/spy_5m.csv",
+      "rows": 4612,
+      "date_range": [
+        "2026-02-06 09:30:00-05:00",
+        "2026-05-04 10:15:00-04:00"
+      ],
+      "sha256": "f1958c80bab18717f3796459e5915caadf59ce3e316b594c2088ccec80c1b173"
+    }
+  ],
+  "strategy_names": [
+    "Strategy0 / Baseline",
+    "Strategy1 / Asymmetric Intervals",
+    "Strategy2 / EMA Filter",
+    "Strategy3 / Exit Confirmation",
+    "Strategy4 / EMA + Confirmation"
+  ],
+  "generated_outputs": [
+    "outputs/figures/drawdowns.png",
+    "outputs/figures/equity_curves.png",
+    "outputs/report/final_report.md",
+    "outputs/tables/reproducibility_manifest.json",
+    "outputs/tables/strategy_summary.csv",
+    "outputs/tables/strategy_summary.md"
+  ],
+  "environment": {
+    "cwd": "/app",
+    "docker_offline_runtime_ready": true,
+    "internet_required_at_runtime": false,
+    "seed": 0,
+    "matplotlib_backend": "Agg",
+    "timezone": "not-set"
+  }
+}

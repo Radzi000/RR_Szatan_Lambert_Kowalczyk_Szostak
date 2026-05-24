@@ -1,30 +1,34 @@
 services:
-  app:
+  reproduce:
     build:
       context: .
       dockerfile: Dockerfile
+    image: intraday-momentum-repro
     volumes:
-      - ./data_cache:/app/data_cache
       - ./outputs:/app/outputs
-    environment:
-      - PYTHONPATH=/app
-    command: pytest --tb=short
+    command: python -m intraday_momentum.reproduce
 
-  backtest:
+  test:
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - ./data_cache:/app/data_cache
-      - ./outputs:/app/outputs
-    environment:
-      - PYTHONPATH=/app
-    command: python -m intraday_momentum.backtest
+    image: intraday-momentum-repro
+    command: pytest
 
   docs:
     build:
       context: .
       dockerfile: Dockerfile
+    image: intraday-momentum-repro
     volumes:
       - ./docs/_build:/app/docs/_build
     command: sphinx-build -b html docs docs/_build/html
+
+  shell:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: intraday-momentum-repro
+    volumes:
+      - ./outputs:/app/outputs
+    entrypoint: /bin/bash

@@ -1,32 +1,37 @@
-# Market Data
+# Data README
 
-This directory contains bundled SPY data for reproducibility.
+This repository is graded on reproducibility. The final workflow therefore uses
+committed repository data and does not require manual downloads.
 
-## Included Files
+## Files Used By The Reproduction Pipeline
 
-- `spy_daily.csv` — Daily OHLCV data, 2017–2026 (~2300 trading days)
-- `spy_5m.csv` — 5-minute intraday bars, last 60 days (~4600 bars)
+- `data/1day/spy_daily.csv`
+  Source: Yahoo Finance SPY daily OHLCV export.
+  Date range: 2017-01-03 to 2026-05-01.
+  Use in pipeline: daily volatility history and leverage scaling inputs.
 
-These files are downloaded from Yahoo Finance and are sufficient to run
-all strategies and reproduce our results.
+- `data/5min/spy_5m.csv`
+  Source: Yahoo Finance SPY 5-minute OHLCV export.
+  Date range: 2026-02-06 14:30:00+00:00 to 2026-05-04 14:15:00+00:00.
+  Use in pipeline: deterministic intraday backtests for Strategy0 through Strategy4.
 
-## Getting More Data
+## Additional Bundled File
 
-For longer intraday history, you can download from Kaggle:
+- `data/spy_1m_2017_2021.csv.gz`
+  Bundled archival file kept for reference only.
+  It is not required by `python -m intraday_momentum.reproduce` and is not used
+  by the grading workflow.
 
-```bash
-# Install Kaggle CLI
-pip install kaggle
+## Reproducibility Notes
 
-# Download SPY 1-minute data 2008-2021 (~23 MB)
-kaggle datasets download -d rockinbrock/spy-1-minute-data -p data/
-unzip data/spy-1-minute-data.zip -d data/
-```
+- No manual download is required for grading.
+- No Google Drive, Kaggle, or external storage is needed.
+- `python -m intraday_momentum.reproduce` and `docker compose up --build reproduce`
+  use committed data only.
+- Live `yfinance` downloads are disabled in reproduce mode.
 
-## Refreshing Data
+## Why Committing The Data Is Acceptable Here
 
-To download fresh data from Yahoo Finance:
-
-```bash
-make download-data
-```
+The committed files are small enough for a course repository, they make the
+grading workflow deterministic, and they remove failure points caused by API
+limits, internet outages, and provider-side revisions.

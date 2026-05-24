@@ -1,6 +1,6 @@
-.PHONY: install dev lint format test docs docker-build docker-test backtest clean help
+.PHONY: help install dev lint format test reproduce docs docker-build docker-test docker-reproduce clean
 
-PYTHON ?= python3
+PYTHON ?= python
 PIP ?= pip
 
 help:  ## Show this help message
@@ -21,35 +21,32 @@ format:  ## Auto-format code with ruff
 	ruff format intraday_momentum/ tests/
 	ruff check --fix intraday_momentum/ tests/
 
-test:  ## Run tests with coverage
-	pytest --tb=short
+test:  ## Run the offline pytest suite
+	pytest
+
+reproduce:  ## Run the deterministic research pipeline locally
+	$(PYTHON) -m intraday_momentum.reproduce
 
 docs:  ## Build Sphinx HTML documentation
 	sphinx-build -b html docs docs/_build/html
-	@echo "Documentation built in docs/_build/html/"
 
-docker-build:  ## Build Docker image
-	docker build -t intraday-momentum .
+docker-build:  ## Build the Docker image
+	docker build -t intraday-momentum-repro .
 
-docker-test:  ## Run tests inside Docker container
-	docker compose run --rm app
+docker-test:  ## Run tests inside Docker
+	docker compose run --rm test
 
-backtest:  ## Run backtesting (requires data)
-	$(PYTHON) -m intraday_momentum.backtest
+docker-reproduce:  ## Build the image and run the deterministic pipeline in Docker
+	docker compose up --build reproduce
 
-clean:  ## Remove build artifacts and caches
-	rm -rf __pycache__ .pytest_cache .ruff_cache
-	rm -rf docs/_build
-	rm -rf *.egg-info
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-
-download-data:  ## Download fresh SPY data from Yahoo Finance
-	$(PYTHON) -c "\
-	import yfinance as yf; import pandas as pd; \
-	d=yf.download('SPY',start='2017-01-01',interval='1d',progress=False); \
-	d.columns=d.columns.get_level_values(0) if isinstance(d.columns,pd.MultiIndex) else d.columns; \
-	d.to_csv('data/spy_daily.csv'); print(f'Daily: {len(d)} rows'); \
-	m=yf.download('SPY',period='60d',interval='5m',progress=False); \
-	m.columns=m.columns.get_level_values(0) if isinstance(m.columns,pd.MultiIndex) else m.columns; \
-	m.to_csv('data/spy_5m.csv'); print(f'5min: {len(m)} rows')"
+clean:  ## Remove caches, build products, and generated outputs
+	$(PYTHON) -c "from pathlib import Path; import shutil; \
+root = Path('.'); \
+[shutil.rmtree(root / rel, ignore_errors=True) for rel in ['docs/_build', '.pytest_cache', '.ruff_cache', 'build', 'dist']]; \
+[shutil.rmtree(path, ignore_errors=True) for path in root.glob('*.egg-info')]; \
+[shutil.rmtree(path, ignore_errors=True) for path in root.rglob('__pycache__') if path.is_dir()]; \
+[path.unlink() for path in root.rglob('*.pyc') if path.is_file()]; \
+outputs = [root / 'outputs', root / 'outputs' / 'tables', root / 'outputs' / 'figures', root / 'outputs' / 'report']; \
+[path.mkdir(parents=True, exist_ok=True) for path in outputs]; \
+[shutil.rmtree(path, ignore_errors=True) or path.mkdir(parents=True, exist_ok=True) for path in outputs[1:]]; \
+[(path / '.gitkeep').touch() for path in outputs]"

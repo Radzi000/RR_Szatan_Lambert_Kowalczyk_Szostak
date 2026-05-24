@@ -1,93 +1,164 @@
-# Intraday Momentum — Reproducible Research
+# Intraday Momentum Reproduction And Extension
 
-> Quantitative Analysis of Intraday Momentum via Volatility Regimes, Trend Filtering, and Temporal Persistence
+This repository is a course project for **Reproducible Research 2026** at the
+University of Warsaw (Jan Kozubowski). It reproduces and extends the intraday
+momentum strategies from the upstream project
+[`blackswan-quants/intraday-momentum`](https://github.com/blackswan-quants/intraday-momentum)
+with a deterministic local backtesting workflow.
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+## Research Question
 
-## Overview
+Do simple intraday momentum rules on SPY remain competitive when extended with:
 
-This project reproduces and extends the intraday momentum trading strategies from
-[blackswan-quants/intraday-momentum](https://github.com/blackswan-quants/intraday-momentum).
-The original strategies were implemented for the QuantConnect cloud platform — we convert them
-to run locally with `yfinance` data, add evaluation tools, and package everything for full
-reproducibility.
+- asymmetric entry and exit timing,
+- EMA trend filtering,
+- exit confirmation logic,
+- and a combined EMA plus confirmation variant?
 
-## Team
+## Team Members
 
-- **Eryk Szatan**
-- **Kacper Lambert**
-- **Natalia Kowalczyk**
-- **Radosław Szostak**
+- Eryk Szatan
+- Kacper Lambert
+- Natalia Kowalczyk
+- Radoslaw Szostak
 
-*University of Warsaw — Reproducible Research (Jan Kozubowski)*
+## Upstream Project Reproduced
 
-## Strategies
+- Original reference: `blackswan-quants/intraday-momentum`
+- This repository ports the strategy logic into an offline local Python workflow
+  and compares five strategy variants on committed SPY data.
 
-| # | Name | Key Feature |
-|---|------|-------------|
-| 0 | Baseline | VWAP exit, 30-min entry checks |
-| 1 | Asymmetric Intervals | Fast exits (5 min), slow entries (30 min) |
-| 2 | EMA Filter | 100-period EMA trend confirmation |
-| 3 | Exit Confirmation | Counter-based exit (4 consecutive bars) |
-| 4 | EMA + Confirmation | Combined EMA filter and confirmed exits |
-
-## Quick Start
-
-### Local Setup
+## One-Command Reproduction
 
 ```bash
-git clone https://github.com/Radzi000/RR_Szatan_Lambert_Kowalczyk_Szostak.git
+git clone <repo-url>
 cd RR_Szatan_Lambert_Kowalczyk_Szostak
-make dev        # install deps + pre-commit hooks
-make test       # run tests
-make docs       # build Sphinx documentation
+docker compose up --build reproduce
 ```
 
-### Docker
+This is the primary grading workflow. It:
+
+- builds the Docker image,
+- runs `python -m intraday_momentum.reproduce`,
+- uses committed data only,
+- generates deterministic outputs under `outputs/`,
+- requires no notebooks and no local Python installation.
+
+## Expected Outputs
+
+After a successful run, the repository writes:
+
+- `outputs/tables/strategy_summary.csv`
+- `outputs/tables/strategy_summary.md`
+- `outputs/tables/reproducibility_manifest.json`
+- `outputs/figures/equity_curves.png`
+- `outputs/figures/drawdowns.png`
+- `outputs/report/final_report.md`
+
+## Strategy Variants Included
+
+- `Strategy0 / Baseline`
+- `Strategy1 / Asymmetric Intervals`
+- `Strategy2 / EMA Filter`
+- `Strategy3 / Exit Confirmation`
+- `Strategy4 / EMA + Confirmation`
+
+## Repository Structure
+
+```text
+intraday_momentum/       Python package with data loading, strategies, backtest engine, plots, and reproduce entry point
+data/                    Committed bundled data used by the grading workflow
+outputs/                 Stable generated artifacts
+tests/                   Offline smoke tests for reproducibility
+docs/                    Sphinx documentation
+notebooks/               Exploratory notebooks, not required for grading
+strategy_development/    Reference strategy code snapshots
+Dockerfile               Docker image definition
+docker-compose.yml       Reproduction and test services
+Makefile                 Local and Docker convenience targets
+AI_USAGE.md              AI disclosure statement
+```
+
+## Data
+
+The final reproducible pipeline uses committed repository data only.
+
+- `data/1day/spy_daily.csv`
+  Source: Yahoo Finance SPY daily OHLCV export.
+  Date range: 2017-01-03 to 2026-05-01.
+
+- `data/5min/spy_5m.csv`
+  Source: Yahoo Finance SPY 5-minute OHLCV export.
+  Date range: 2026-02-06 14:30:00+00:00 to 2026-05-04 14:15:00+00:00.
+
+- No manual download is required.
+- No internet is needed in reproduce mode.
+- The pipeline does not depend on Google Drive, Kaggle, or live `yfinance`.
+
+Additional details are documented in [data/README.md](/C:/Users/Rados/RR/data/README.md).
+
+## Local Development
 
 ```bash
-make docker-build
-docker compose run --rm app       # run tests
-docker compose run --rm backtest  # run strategies
+make dev
+make test
+make reproduce
 ```
 
-### Run a Backtest
+Main targets:
 
-```python
-from intraday_momentum.data.provider import DataProvider
-from intraday_momentum.strategies import Strategy0
-from intraday_momentum.backtest.engine import BacktestEngine
+- `make reproduce` runs `python -m intraday_momentum.reproduce`
+- `make test` runs the offline pytest suite
+- `make docker-reproduce` runs `docker compose up --build reproduce`
+- `make docker-test` runs pytest inside Docker
 
-provider = DataProvider("SPY")
-daily = provider.get_daily_data("2023-01-01", "2023-12-31")
-minute = provider.get_data("2023-11-01", "2023-12-31")
+## Docker
 
-strategy = Strategy0(lookback=14, vol_target=0.02)
-engine = BacktestEngine(initial_capital=100_000)
-result = engine.run(strategy, daily, minute)
-print(result.summary())
+Primary command:
+
+```bash
+docker compose up --build reproduce
 ```
 
-## Project Structure
+Optional:
 
-```
-├── intraday_momentum/       # Main Python package
-│   ├── strategies/          # Strategy implementations (0-4)
-│   ├── backtest/            # Backtesting engine
-│   ├── data/                # Data provider (yfinance)
-│   ├── evaluation/          # Performance metrics
-│   └── visualization/       # Plotting utilities
-├── strategy_development/    # Original QuantConnect code (reference)
-├── notebooks/               # Jupyter/Marimo experimentation
-├── tests/                   # pytest test suite
-├── docs/                    # Sphinx documentation
-├── Dockerfile               # Container definition
-├── docker-compose.yml       # Service orchestration
-├── Makefile                 # Automation targets
-└── pyproject.toml           # Project config, deps, linting
+```bash
+docker compose run --rm test
+docker run --rm -v ${PWD}/outputs:/app/outputs intraday-momentum-repro
 ```
 
-## Makefile Targets
+If a Docker Hub image is published later, it can be documented here as a stable
+pull target. At the moment, the repository build is the canonical workflow.
 
-Run `make help` to see all available targets:
-`install`, `dev`, `lint`, `format`, `test`, `docs`, `docker-build`, `docker-test`, `backtest`, `clean`.
+## Reproducibility Checklist
+
+- committed input data in the repository
+- deterministic CLI pipeline in `python -m intraday_momentum.reproduce`
+- Docker environment for grading
+- fixed strategy parameters
+- stable output filenames under `outputs/`
+- offline smoke tests
+
+## AI Usage Disclosure
+
+AI usage is disclosed in [AI_USAGE.md](/C:/Users/Rados/RR/AI_USAGE.md).
+
+## Citations And Sources
+
+- `blackswan-quants/intraday-momentum`, upstream strategy reference:
+  https://github.com/blackswan-quants/intraday-momentum
+- Yahoo Finance SPY OHLCV data, used for the committed daily and 5-minute files.
+
+## Known Limitations
+
+- The final grading workflow is based on the committed 5-minute SPY file rather
+  than a longer 2-minute research dataset.
+- Intraday history is limited to the committed file range, so the project favors
+  deterministic reproducibility over broader data coverage.
+- Exploratory notebooks remain in the repository for transparency, but they are
+  not required by the grading workflow.
+
+## Acknowledgment Guidance
+
+If this repository is cited or reused, please acknowledge both the upstream
+`blackswan-quants/intraday-momentum` project and this course reproduction.

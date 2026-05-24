@@ -27,7 +27,14 @@ htmlcov/
 data_cache/
 
 # Outputs
-outputs/
+outputs/*
+!outputs/.gitkeep
+!outputs/tables/
+!outputs/tables/.gitkeep
+!outputs/figures/
+!outputs/figures/.gitkeep
+!outputs/report/
+!outputs/report/.gitkeep
 
 # Sphinx build
 docs/_build/

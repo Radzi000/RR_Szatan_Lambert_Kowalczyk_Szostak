@@ -1,8 +1,8 @@
-"""Market data provider using yfinance with local CSV fallback.
+"""Market data provider using bundled CSV files by default.
 
-Downloads and caches OHLCV data for backtesting intraday momentum strategies.
-Supports multiple intervals and automatically falls back to bundled CSV files
-included in the repository for reproducibility.
+The reproducible pipeline is intentionally offline-first: it loads committed
+CSV data from the repository and only attempts live ``yfinance`` downloads
+when explicitly enabled.
 """
 
 from __future__ import annotations
@@ -30,10 +30,7 @@ _INTERVAL_MAX_DAYS = {
 
 
 class DataProvider:
-    """Download and cache market data via yfinance.
-
-    Falls back to bundled CSV files in the ``data/`` directory when
-    live downloads are unavailable (e.g. inside Docker without internet).
+    """Load market data from committed files, with optional yfinance fallback.
 
     Parameters
     ----------
@@ -44,6 +41,9 @@ class DataProvider:
     data_dir : Path | str | None
         Directory containing bundled CSV files. Defaults to ``data/``
         in the project root.
+    allow_download : bool
+        If ``True``, allow live ``yfinance`` downloads when bundled data
+        is unavailable. Defaults to ``False`` for reproducibility.
 
     Examples
     --------
@@ -56,11 +56,51 @@ class DataProvider:
         ticker: str = "SPY",
         cache_dir: Path | str = DEFAULT_CACHE_DIR,
         data_dir: Path | str | None = None,
+        allow_download: bool = False,
     ) -> None:
         self.ticker = ticker
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.data_dir = Path(data_dir) if data_dir else BUNDLED_DATA_DIR
+        self.allow_download = allow_download
+
+    def _bundled_paths(self, filename: str) -> list[Path]:
+        """Return candidate locations for a bundled data file."""
+        nested_map = {
+            "spy_daily.csv": self.data_dir / "1day" / "spy_daily.csv",
+            "spy_5m.csv": self.data_dir / "5min" / "spy_5m.csv",
+            "spy_1m_2017_2021.csv.gz": self.data_dir / "spy_1m_2017_2021.csv.gz",
+            "spy_2m.csv": self.data_dir / "2min" / "spy_2m.csv",
+        }
+        paths = [nested_map.get(filename, self.data_dir / filename), self.data_dir / filename]
+        unique_paths: list[Path] = []
+        for path in paths:
+            if path is not None and path not in unique_paths:
+                unique_paths.append(path)
+        return unique_paths
+
+    @staticmethod
+    def _slice_dataframe(df: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
+        """Slice a DataFrame between inclusive start and end bounds."""
+        start_ts = pd.Timestamp(start)
+        end_ts = pd.Timestamp(end)
+
+        if len(start) == 10:
+            start_ts = start_ts.normalize()
+        if len(end) == 10:
+            end_ts = end_ts.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+
+        if df.index.tz is not None:
+            if start_ts.tzinfo is None:
+                start_ts = start_ts.tz_localize(df.index.tz)
+            else:
+                start_ts = start_ts.tz_convert(df.index.tz)
+            if end_ts.tzinfo is None:
+                end_ts = end_ts.tz_localize(df.index.tz)
+            else:
+                end_ts = end_ts.tz_convert(df.index.tz)
+
+        return df.loc[(df.index >= start_ts) & (df.index <= end_ts)]
 
     def _load_bundled(self, filename: str) -> pd.DataFrame | None:
         """Try to load a bundled CSV file from the data directory.
@@ -75,27 +115,26 @@ class DataProvider:
         pd.DataFrame | None
             Loaded data, or ``None`` if file not found.
         """
-        path = self.data_dir / filename
-        if not path.exists():
-            return None
-        logger.info("Loading bundled data from %s", path)
-        df = pd.read_csv(
-            path,
-            index_col=0,
-            parse_dates=True,
-            compression="gzip" if str(path).endswith(".gz") else None,
-        )
-        df.index.name = "Datetime"
-        # Convert to US/Eastern if timezone-aware (UTC from yfinance)
-        if df.index.tz is not None:
-            df.index = df.index.tz_convert("US/Eastern")
-        elif any(c in filename for c in ["1m", "2m", "5m", "15m", "30m"]):
-            # Intraday data from yfinance is UTC
-            try:
-                df.index = df.index.tz_localize("UTC").tz_convert("US/Eastern")
-            except TypeError:
-                pass
-        return df
+        for path in self._bundled_paths(filename):
+            if not path.exists():
+                continue
+            logger.info("Loading bundled data from %s", path)
+            df = pd.read_csv(
+                path,
+                index_col=0,
+                parse_dates=True,
+                compression="gzip" if str(path).endswith(".gz") else None,
+            )
+            df.index.name = "Datetime"
+            if df.index.tz is not None:
+                df.index = df.index.tz_convert("US/Eastern")
+            elif any(c in filename for c in ["1m", "2m", "5m", "15m", "30m"]):
+                try:
+                    df.index = df.index.tz_localize("UTC").tz_convert("US/Eastern")
+                except TypeError:
+                    pass
+            return df
+        return None
 
     def get_data(
         self,
@@ -140,8 +179,7 @@ class DataProvider:
         if bundled_file:
             df = self._load_bundled(bundled_file)
             if df is not None:
-                mask = (df.index >= start) & (df.index <= end)
-                subset = df.loc[mask]
+                subset = self._slice_dataframe(df, start, end)
                 if not subset.empty:
                     logger.info("Using bundled data: %d rows", len(subset))
                     return subset
@@ -151,12 +189,17 @@ class DataProvider:
         if use_cache and cache.exists():
             logger.info("Loading cached data from %s", cache)
             df = pd.read_parquet(cache)
-            mask = (df.index >= start) & (df.index <= end)
-            subset = df.loc[mask]
+            subset = self._slice_dataframe(df, start, end)
             if not subset.empty:
                 return subset
 
         # 3. Download fresh
+        if not self.allow_download:
+            msg = (
+                f"Bundled or cached {interval} data not available for {self.ticker} "
+                f"between {start} and {end}, and live downloads are disabled."
+            )
+            raise FileNotFoundError(msg)
         logger.info("Downloading %s %s data %s -> %s", self.ticker, interval, start, end)
         start_dt = datetime.strptime(start, "%Y-%m-%d")
         end_dt = datetime.strptime(end, "%Y-%m-%d")
@@ -228,11 +271,17 @@ class DataProvider:
         # Try bundled
         df = self._load_bundled("spy_daily.csv")
         if df is not None:
-            mask = (df.index >= start) & (df.index <= end)
-            subset = df.loc[mask]
+            subset = self._slice_dataframe(df, start, end)
             if not subset.empty:
                 logger.info("Using bundled daily data: %d rows", len(subset))
                 return subset
+
+        if not self.allow_download:
+            msg = (
+                f"Bundled daily data not available for {self.ticker} "
+                f"between {start} and {end}, and live downloads are disabled."
+            )
+            raise FileNotFoundError(msg)
 
         logger.info("Downloading %s daily data %s -> %s", self.ticker, start, end)
         df = yf.download(
