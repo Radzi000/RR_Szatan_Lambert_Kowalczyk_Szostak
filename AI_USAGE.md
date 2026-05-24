@@ -2,7 +2,7 @@
 
 ## Tools And Models
 
-- OpenAI Codex / GPT-5 coding assistance was used during repository cleanup,
+- OpenAI Codex / GPT-5 / Anthropic Claude Opus 4.6 coding assistance was used during repository cleanup,
   documentation drafting, and reproducibility engineering.
 
 ## Scope Of Use
