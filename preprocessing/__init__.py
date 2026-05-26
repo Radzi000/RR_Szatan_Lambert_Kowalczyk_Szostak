@@ -43,12 +43,20 @@ def export_split_csvs(*args, **kwargs):
     return _export(*args, **kwargs)
 
 
+def materialize_processed_data(*args, **kwargs):
+    """Lazily dispatch to the processed-data materializer."""
+    from .materialize_processed_data import materialize_processed_data as _materialize
+
+    return _materialize(*args, **kwargs)
+
+
 __all__ = [
     "build_data_manifest",
     "build_global_split_manifest",
     "discover_data_files",
     "export_split_csvs",
     "export_unified_csvs",
+    "materialize_processed_data",
     "normalize_ohlcv_frame",
     "validate_ohlcv_schema",
 ]

@@ -5,10 +5,9 @@ maximizing a user-chosen objective (Sharpe ratio by default).
 
 Example
 -------
->>> from intraday_momentum.optimization import StrategyTuner, PARAM_SPACES
->>> from intraday_momentum.strategies.strategy0 import Strategy0
->>> from intraday_momentum.backtest.engine import BacktestEngine
->>> from intraday_momentum.data.provider import DataProvider
+>>> from strategy_development.local_implementation.optimization import PARAM_SPACES, StrategyTuner
+>>> from strategy_development.local_implementation.strategies.strategy0 import Strategy0
+>>> from strategy_development.local_implementation.data.provider import DataProvider
 >>>
 >>> provider = DataProvider()
 >>> daily = provider.get_daily_data("2019-01-01", "2019-12-31")

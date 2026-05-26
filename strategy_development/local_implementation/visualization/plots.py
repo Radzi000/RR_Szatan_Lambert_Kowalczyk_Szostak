@@ -1,13 +1,13 @@
 """Publication-quality charts for strategy analysis.
 
 Provides a set of standalone plotting functions that accept
-:class:`~intraday_momentum.backtest.engine.BacktestResult` objects
+:class:`~strategy_development.local_implementation.backtest.engine.BacktestResult` objects
 and produce Matplotlib figures. All functions return the figure so
 callers can further customise or save to disk.
 
 Example
 -------
->>> from intraday_momentum.visualization.plots import plot_equity_curve
+>>> from strategy_development.local_implementation.visualization.plots import plot_equity_curve
 >>> fig = plot_equity_curve(result, title="Strategy 0 — Equity")
 >>> fig.savefig("equity.png", dpi=150)
 """

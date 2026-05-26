@@ -10,7 +10,6 @@ import random
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 
@@ -24,60 +23,12 @@ import pandas as pd
 
 from .backtest.engine import BacktestEngine, BacktestResult
 from .data.provider import DataProvider
-from .strategies import Strategy0, Strategy1, Strategy2, Strategy3, Strategy4
+from .strategy_specs import STRATEGY_SPECS
 from .visualization.plots import plot_strategy_comparison
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "outputs"
 DATA_ROOT = PROJECT_ROOT / "data"
-
-
-@dataclass(frozen=True)
-class StrategySpec:
-    """Configuration for one deterministic strategy run."""
-
-    label: str
-    factory: type
-    params: dict[str, int | float]
-
-
-STRATEGY_SPECS = [
-    StrategySpec("Strategy0 / Baseline", Strategy0, {"lookback": 14, "vol_target": 0.02}),
-    StrategySpec(
-        "Strategy1 / Asymmetric Intervals",
-        Strategy1,
-        {"lookback": 14, "vol_target": 0.02, "entry_interval": 30, "exit_interval": 5},
-    ),
-    StrategySpec(
-        "Strategy2 / EMA Filter",
-        Strategy2,
-        {"lookback": 14, "vol_target": 0.02, "entry_interval": 30, "ema_period": 100},
-    ),
-    StrategySpec(
-        "Strategy3 / Exit Confirmation",
-        Strategy3,
-        {
-            "lookback": 14,
-            "vol_target": 0.02,
-            "entry_interval": 30,
-            "exit_interval": 5,
-            "exit_confirmation_bars": 4,
-        },
-    ),
-    StrategySpec(
-        "Strategy4 / EMA + Confirmation",
-        Strategy4,
-        {
-            "lookback": 14,
-            "vol_target": 0.02,
-            "entry_interval": 30,
-            "exit_interval": 5,
-            "exit_confirmation_bars": 4,
-            "ema_period": 100,
-        },
-    ),
-]
-
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()

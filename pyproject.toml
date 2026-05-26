@@ -67,4 +67,4 @@ testpaths = ["tests"]
 addopts = "--tb=short"
 
 [tool.setuptools.packages.find]
-include = ["strategy_development*", "preprocessing*", "trade_dependency*", "final_portfolio*", "intraday_momentum*"]
+include = ["strategy_development*", "preprocessing*", "trade_dependency*", "final_portfolio*"]

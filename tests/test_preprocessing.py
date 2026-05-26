@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 import pandas as pd
 
-from preprocessing import build_data_manifest, build_global_split_manifest, discover_data_files, export_unified_csvs as build_unified_csvs
+from preprocessing import build_global_split_manifest, discover_data_files, export_unified_csvs as build_unified_csvs
+from preprocessing.build_data_manifest import build_data_manifest
 from preprocessing.build_data_manifest import DATA_ROOT, discover_assets, load_raw_csv
 from preprocessing.splitter import DataSplitter
 from preprocessing.validate_schema import normalize_ohlcv_frame, validate_ohlcv_schema

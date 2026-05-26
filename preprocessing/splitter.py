@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_SPLIT_PATH = DATA_ROOT / "processed" / "splits" / "global_time_splits.json"
 
 
+def load_split_manifest(split_manifest_path: Path = DEFAULT_SPLIT_PATH) -> dict[str, object]:
+    """Load the raw split manifest JSON from disk."""
+    return json.loads(split_manifest_path.read_text(encoding="utf-8"))
+
+
 @dataclass(frozen=True)
 class SplitBoundary:
     """Time boundaries for one data partition.
@@ -91,7 +96,7 @@ class DataSplitter:
 
     def _load_boundaries(self) -> dict[str, SplitBoundary]:
         """Parse the split manifest JSON into typed boundaries."""
-        raw = json.loads(self.split_manifest_path.read_text(encoding="utf-8"))
+        raw = load_split_manifest(self.split_manifest_path)
         bounds = raw["split_boundaries"]
         result: dict[str, SplitBoundary] = {}
         for partition in ("train", "validation", "test"):

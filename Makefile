@@ -1,4 +1,4 @@
-.PHONY: help install dev lint format test data-manifest splits preprocess reproduce docker-build docker-test docker-reproduce clean
+.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m reproduce docker-build docker-test docker-reproduce clean
 
 PYTHON ?= python
 PIP ?= pip
@@ -31,8 +31,10 @@ splits:  ## Build deterministic global train/validation/test split boundaries
 	$(PYTHON) -m preprocessing.make_global_splits
 
 preprocess:  ## Run deterministic preprocessing foundation steps
-	$(MAKE) data-manifest
-	$(MAKE) splits
+	$(PYTHON) -m preprocessing.materialize_processed_data
+
+fixed-15m:  ## Run the fixed-parameter 15-minute cross-asset experiment runner
+	$(PYTHON) -m strategy_development.local_implementation.run_fixed_15m_experiments
 
 reproduce:  ## Run the deterministic research pipeline locally
 	$(PYTHON) -m strategy_development.local_implementation.reproduce

@@ -4,6 +4,12 @@ This planning document predates the cleanup that moved the working local impleme
 `strategy_development/local_implementation/`. It is kept as historical design context, but
 the repository root and README now reflect the implemented structure.
 
+Historical note:
+
+- references below to `intraday_momentum/` are historical design references
+- the current authoritative local implementation lives in
+  `strategy_development/local_implementation/`
+
 ## 1. Executive Recommendation
 
 ### Recommendation

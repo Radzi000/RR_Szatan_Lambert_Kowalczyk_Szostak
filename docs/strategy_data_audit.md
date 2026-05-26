@@ -4,6 +4,12 @@
 
 This report reviews the original QuantConnect-style reference strategies in [strategy_development/taken_strategies](/C:/Users/Rados/RR/strategy_development/taken_strategies), compares them with the current local implementation in [strategy_development/local_implementation](/C:/Users/Rados/RR/strategy_development/local_implementation), and proposes a practical next-step research design that preserves the existing deterministic Docker baseline.
 
+Historical note:
+
+- some later sections retain historical references to `intraday_momentum/`
+- the current authoritative executable implementation is
+  `strategy_development/local_implementation/`
+
 Current reproducibility boundary:
 
 - The existing local baseline is the Docker workflow documented in [README.md](/C:/Users/Rados/RR/README.md) and implemented by [strategy_development/local_implementation/reproduce.py](/C:/Users/Rados/RR/strategy_development/local_implementation/reproduce.py).
