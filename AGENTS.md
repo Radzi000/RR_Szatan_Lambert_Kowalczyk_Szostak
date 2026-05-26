@@ -20,7 +20,10 @@ Pipeline story:
 - Local tests: `pytest`
 - Local reproduction: `python -m strategy_development.local_implementation.reproduce`
 - Fixed 15-minute baseline: `python -m strategy_development.local_implementation.run_fixed_15m_experiments`
+- Workstream C optimization: `python -m strategy_development.local_implementation.optimization.run_all_optimizations`
+- Workstream C optimization smoke: `python -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke`
 - Docker reproduction: `docker compose up --build reproduce`
+- Docker optimization smoke: `docker compose run --rm optimization`
 - Clean Docker rebuild: `docker compose down`, `docker compose build --no-cache`, `docker compose up reproduce`
 
 If you change code or docs that affect the pipeline, rerun the local commands.
@@ -47,6 +50,8 @@ If Docker is available, keep the Docker command passing too.
 - Use test only for final out-of-sample evaluation.
 - If adding Workstream C functionality, ensure emitted outputs distinguish
   `train`, `validation`, and `test` explicitly.
+- Never load the `test` partition inside optimization scripts.
+- Keep Workstream C deterministic with explicit seeds.
 
 ## Data And Preprocessing Guardrails
 
@@ -79,6 +84,13 @@ If Docker is available, keep the Docker command passing too.
   `fixed_15m_strategy_returns.csv`,
   `fixed_15m_trade_logs.csv`,
   and `fixed_15m_train_validation_test_summary.csv`.
+- The Workstream C aggregate runner should emit:
+  `optimization_search_results.csv`,
+  `selected_params.csv`,
+  `train_validation_comparison.csv`,
+  `optimization_verification_metrics.csv`,
+  `optimization_convergence.png`,
+  and `train_validation_sharpe_comparison.png`.
 
 ## Documentation And Tests
 

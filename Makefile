@@ -1,4 +1,4 @@
-.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m reproduce docker-build docker-test docker-reproduce clean
+.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke report-quarto reproduce docker-build docker-test docker-reproduce clean
 
 PYTHON ?= python
 PIP ?= pip
@@ -35,6 +35,15 @@ preprocess:  ## Run deterministic preprocessing foundation steps
 
 fixed-15m:  ## Run the fixed-parameter 15-minute cross-asset experiment runner
 	$(PYTHON) -m strategy_development.local_implementation.run_fixed_15m_experiments
+
+optimize:  ## Run the full Workstream C train/validation optimization suite
+	$(PYTHON) -m strategy_development.local_implementation.optimization.run_all_optimizations
+
+optimize-smoke:  ## Run the small smoke-mode Workstream C optimization suite
+	$(PYTHON) -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke
+
+report-quarto:  ## Render the optional Quarto Workstream C report if Quarto is installed
+	quarto render reports/workstream_c_optimization_report.qmd
 
 reproduce:  ## Run the deterministic research pipeline locally
 	$(PYTHON) -m strategy_development.local_implementation.reproduce

@@ -37,5 +37,29 @@ This directory is the research-facing home for:
 
 - preserved upstream reference files,
 - the current local executable implementation,
-- future experiment configuration files,
-- future fixed-parameter and tuned-parameter experiment metadata.
+- fixed-parameter baseline experiment outputs,
+- train/validation optimization entry points and outputs.
+
+## Workstream C
+
+Workstream C is implemented under
+`strategy_development/local_implementation/optimization/`.
+
+Canonical commands:
+
+- `python -m strategy_development.local_implementation.optimization.run_strategy1_nes`
+- `python -m strategy_development.local_implementation.optimization.run_strategy2_nes`
+- `python -m strategy_development.local_implementation.optimization.run_strategy3_nes`
+- `python -m strategy_development.local_implementation.optimization.run_strategy4_cmaes`
+- `python -m strategy_development.local_implementation.optimization.run_strategy5_cmaes`
+- `python -m strategy_development.local_implementation.optimization.run_all_optimizations`
+
+Rules:
+
+- strategies 1-3 use NES
+- strategies 4-5 use CMA-ES
+- optimization uses train only
+- validation is used only for verification and parameter selection
+- test/OOS remains reserved for a later final evaluation stage
+
+Aggregate outputs are written under `outputs/tables/` and `outputs/figures/`.

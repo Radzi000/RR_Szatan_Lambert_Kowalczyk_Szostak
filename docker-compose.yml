@@ -23,3 +23,12 @@ services:
     volumes:
       - ./outputs:/app/outputs
     entrypoint: /bin/bash
+
+  optimization:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: intraday-momentum-repro
+    volumes:
+      - ./outputs:/app/outputs
+    command: python -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke

@@ -1,0 +1,97 @@
+---
+title: "Workstream C Optimization Report"
+format:
+  html:
+    toc: true
+execute:
+  echo: false
+---
+
+## Purpose
+
+Workstream C implements deterministic train-only parameter optimization for the
+five local intraday momentum strategies reproduced in
+`strategy_development/local_implementation/`.
+
+- Strategies 1-3 use NES.
+- Strategies 4-5 use CMA-ES.
+- Optimization uses the train split only.
+- Validation is used only for post-fit verification and parameter selection.
+- Test/OOS is reserved for a later final evaluation stage.
+
+## Inputs
+
+The optimization stage consumes the deterministic A/B contract:
+
+- `data/processed/manifests/data_manifest.json`
+- `data/processed/splits/global_time_splits.json`
+- `data/processed/unified/*.csv`
+- `data/processed/splits/csv/*.csv`
+- `outputs/tables/fixed_15m_strategy_summary.csv`
+- `outputs/tables/fixed_15m_strategy_returns.csv`
+- `outputs/tables/fixed_15m_trade_logs.csv`
+- `outputs/tables/fixed_15m_train_validation_test_summary.csv`
+
+## Outputs
+
+The aggregate optimization runner writes:
+
+- `outputs/tables/optimization_search_results.csv`
+- `outputs/tables/selected_params.csv`
+- `outputs/tables/train_validation_comparison.csv`
+- `outputs/tables/optimization_verification_metrics.csv`
+- `outputs/figures/optimization_convergence.png`
+- `outputs/figures/train_validation_sharpe_comparison.png`
+
+## Commands
+
+Local preprocessing and baseline:
+
+```bash
+python -m preprocessing.materialize_processed_data
+python -m strategy_development.local_implementation.run_fixed_15m_experiments
+```
+
+Optimization:
+
+```bash
+python -m strategy_development.local_implementation.optimization.run_all_optimizations
+python -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke
+```
+
+Docker smoke run:
+
+```bash
+docker compose run --rm optimization
+```
+
+Optional Quarto render:
+
+```bash
+quarto render reports/workstream_c_optimization_report.qmd
+```
+
+## Metrics
+
+Optimization writes train and validation metrics including:
+
+- total return
+- annualized return
+- annualized volatility
+- Sharpe
+- Sortino
+- max drawdown
+- Calmar
+- hit rate
+- turnover
+- trade count
+- average trade PnL
+- exposure time
+
+## Notes
+
+- The optimization stage does not touch the test split.
+- The canonical `docker compose up --build reproduce` baseline remains focused on
+  the faster 5-minute SPY reproduction.
+- The optional optimization service is smoke-mode only to keep Docker runtime
+  practical during development.
