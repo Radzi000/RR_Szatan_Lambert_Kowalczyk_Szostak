@@ -12,6 +12,9 @@ import pandas as pd
 
 from .common import (
     TABLE_FILENAMES,
+    EvaluationCache,
+    ProgressLogger,
+    RuntimeGuard,
     add_common_args,
     build_cost_config_from_args,
     default_strategy_configs,
@@ -19,6 +22,7 @@ from .common import (
     parse_asset_list,
     run_backtest_for_params_with_costs,
     run_strategy_optimization,
+    runtime_settings_from_args,
 )
 from .io import ensure_output_dirs, write_convergence_plot, write_csv, write_train_validation_plot
 from .metrics import compute_metric_bundle
@@ -174,77 +178,91 @@ def _write_our_strategy_artifacts(
     selected_params: pd.DataFrame,
     output_dir: Path,
     cost_config,
+    curve_data: pd.DataFrame | None = None,
+    verification_data: pd.DataFrame | None = None,
 ) -> list[Path]:
     tables_dir = output_dir / "tables"
     figures_dir = output_dir / "figures"
     config_by_label = {config.spec.label: config for config in default_strategy_configs()}
 
-    curve_rows: list[dict[str, object]] = []
-    verification_rows: list[dict[str, object]] = []
+    if curve_data is None or curve_data.empty:
+        curve_rows: list[dict[str, object]] = []
+        verification_rows: list[dict[str, object]] = []
 
-    for row in selected_params.itertuples(index=False):
-        config = config_by_label[row.strategy]
-        params = json.loads(row.params_json)
-        split_data = load_optimization_splits(row.asset, row.asset_class)
+        for row in selected_params.itertuples(index=False):
+            config = config_by_label[row.strategy]
+            params = json.loads(row.params_json)
+            split_data = load_optimization_splits(row.asset, row.asset_class)
 
-        for split_name in ["train", "validation"]:
-            daily_data, minute_data = split_data[split_name]
-            result, _ = run_backtest_for_params_with_costs(
-                config.spec.factory,
-                params,
-                daily_data,
-                minute_data,
-                asset_class=row.asset_class,
-                cost_config=cost_config,
-            )
-            metrics = compute_metric_bundle(result, minute_data)
-            detail_frame = _curve_detail_frame(
-                result,
-                strategy=row.strategy,
-                optimizer=row.optimizer,
-                asset=row.asset,
-                asset_class=row.asset_class,
-                frequency=row.frequency,
-                split=split_name,
-                params_json=row.params_json,
-                selected_by=row.selected_by,
-                cost_bps=float(row.cost_bps),
-            )
-            if not detail_frame.empty:
-                curve_rows.extend(detail_frame.to_dict("records"))
+            for split_name in ["train", "validation"]:
+                daily_data, minute_data = split_data[split_name]
+                result, _ = run_backtest_for_params_with_costs(
+                    config.spec.factory,
+                    params,
+                    daily_data,
+                    minute_data,
+                    asset_class=row.asset_class,
+                    cost_config=cost_config,
+                )
+                metrics = compute_metric_bundle(result, minute_data)
+                detail_frame = _curve_detail_frame(
+                    result,
+                    strategy=row.strategy,
+                    optimizer=row.optimizer,
+                    asset=row.asset,
+                    asset_class=row.asset_class,
+                    frequency=row.frequency,
+                    split=split_name,
+                    params_json=row.params_json,
+                    selected_by=row.selected_by,
+                    cost_bps=float(row.cost_bps),
+                )
+                if not detail_frame.empty:
+                    curve_rows.extend(detail_frame.to_dict("records"))
 
-            verification_rows.append(
-                {
-                    "strategy": row.strategy,
-                    "config_source": "optimized",
-                    "optimizer": row.optimizer,
-                    "asset": row.asset,
-                    "asset_class": row.asset_class,
-                    "frequency": row.frequency,
-                    "split": split_name,
-                    "cost_bps": round(float(row.cost_bps), 6),
-                    "gross_total_return": round(float(metrics.gross_total_return), 6),
-                    "net_total_return": round(float(metrics.net_total_return), 6),
-                    "annualized_return": round(float(metrics.annualized_return), 6),
-                    "annualized_volatility": round(float(metrics.annualized_volatility), 6),
-                    "net_sharpe": round(float(metrics.net_sharpe), 6),
-                    "sortino": round(float(metrics.sortino), 6),
-                    "max_drawdown": round(float(metrics.max_drawdown), 6),
-                    "calmar": round(float(metrics.calmar), 6),
-                    "hit_rate": round(float(metrics.hit_rate), 6),
-                    "turnover": round(float(metrics.turnover), 6),
-                    "total_transaction_cost": round(float(metrics.total_transaction_cost), 6),
-                    "trade_count": int(metrics.trade_count),
-                    "average_trade_pnl": round(float(metrics.average_trade_pnl), 6),
-                    "exposure_time": round(float(metrics.exposure_time), 6),
-                    "params_json": row.params_json,
-                    "selected_by": row.selected_by,
-                }
-            )
+                verification_rows.append(
+                    {
+                        "strategy": row.strategy,
+                        "config_source": "optimized",
+                        "optimizer": row.optimizer,
+                        "asset": row.asset,
+                        "asset_class": row.asset_class,
+                        "frequency": row.frequency,
+                        "split": split_name,
+                        "cost_bps": round(float(row.cost_bps), 6),
+                        "gross_total_return": round(float(metrics.gross_total_return), 6),
+                        "net_total_return": round(float(metrics.net_total_return), 6),
+                        "annualized_return": round(float(metrics.annualized_return), 6),
+                        "annualized_volatility": round(float(metrics.annualized_volatility), 6),
+                        "net_sharpe": round(float(metrics.net_sharpe), 6),
+                        "sortino": round(float(metrics.sortino), 6),
+                        "max_drawdown": round(float(metrics.max_drawdown), 6),
+                        "calmar": round(float(metrics.calmar), 6),
+                        "hit_rate": round(float(metrics.hit_rate), 6),
+                        "turnover": round(float(metrics.turnover), 6),
+                        "total_transaction_cost": round(float(metrics.total_transaction_cost), 6),
+                        "trade_count": int(metrics.trade_count),
+                        "average_trade_pnl": round(float(metrics.average_trade_pnl), 6),
+                        "exposure_time": round(float(metrics.exposure_time), 6),
+                        "params_json": row.params_json,
+                        "selected_by": row.selected_by,
+                    }
+                )
+        curve_df = pd.DataFrame(curve_rows)
+        verification_df = pd.DataFrame(verification_rows)
+    else:
+        curve_df = curve_data.copy()
+        verification_df = (
+            verification_data[
+                (verification_data["config_source"] == "optimized")
+                & (verification_data["split"].isin(["train", "validation"]))
+            ].copy()
+            if verification_data is not None and not verification_data.empty
+            else pd.DataFrame()
+        )
 
-    curve_df = _sanitize_curve_frame(pd.DataFrame(curve_rows), label="our strategy chart data")
+    curve_df = _sanitize_curve_frame(curve_df, label="our strategy chart data")
     aggregated_df = _aggregate_curve_frame(curve_df)
-    verification_df = pd.DataFrame(verification_rows)
 
     equity_path = tables_dir / "equity_curves_our_strats.csv"
     drawdown_path = tables_dir / "drawdowns_our_strats.csv"
@@ -320,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run all Workstream C optimization pipelines.")
     add_common_args(parser)
     args = parser.parse_args(argv)
+    settings = runtime_settings_from_args(args)
 
     output_dir = Path(args.output_dir)
     tables_dir, figures_dir = ensure_output_dirs(output_dir)
@@ -330,18 +349,59 @@ def main(argv: list[str] | None = None) -> int:
         "selected_params": [],
         "comparison": [],
         "verification": [],
+        "curves": [],
     }
+    selected_assets = parse_asset_list(args.assets)
+    strategy_count = len(default_strategy_configs())
+    if selected_assets:
+        asset_count = len(selected_assets)
+    else:
+        from .common import _discover_assets
+
+        asset_count = len(
+            _discover_assets(
+                None,
+                settings.smoke,
+                asset_sample=settings.asset_sample,
+                max_assets=settings.max_assets,
+            )
+        )
+    candidate_backtests = 0
+    for config in default_strategy_configs():
+        effective_population = max(settings.population, 4 if config.optimizer == "CMA-ES" else 2)
+        if config.optimizer == "NES" and effective_population % 2 != 0:
+            effective_population += 1
+        candidate_backtests += asset_count * settings.max_iters * effective_population
+    print(
+        "[optimization] "
+        f"mode={settings.mode} strategies={strategy_count} assets={asset_count} "
+        f"iterations={settings.max_iters} population={settings.population} "
+        f"candidate_backtests={candidate_backtests} "
+        f"validation_candidates={settings.validation_candidates} "
+        f"timeout_minutes={settings.timeout_minutes}",
+        flush=True,
+    )
+    guard = RuntimeGuard(settings.timeout_minutes)
+    progress = ProgressLogger(total_candidates=candidate_backtests, guard=guard)
+    cache = EvaluationCache()
 
     for config in default_strategy_configs():
         result_frames = run_strategy_optimization(
             config,
-            max_iters=args.max_iters,
-            population=args.population,
+            max_iters=settings.max_iters,
+            population=settings.population,
             seed=args.seed,
-            smoke=args.smoke,
+            smoke=settings.smoke,
             output_dir=output_dir,
-            assets=parse_asset_list(args.assets),
+            assets=selected_assets,
             cost_config=cost_config,
+            asset_sample=settings.asset_sample,
+            max_assets=settings.max_assets,
+            timeout_minutes=settings.timeout_minutes,
+            cache=cache,
+            guard=guard,
+            progress=progress,
+            validation_candidates=settings.validation_candidates,
         )
         for key, frame in result_frames.items():
             aggregated[key].append(frame)
@@ -368,6 +428,8 @@ def main(argv: list[str] | None = None) -> int:
         selected_params=combined["selected_params"],
         output_dir=output_dir,
         cost_config=cost_config,
+        curve_data=combined.get("curves"),
+        verification_data=combined.get("verification"),
     )
 
     for path in [
