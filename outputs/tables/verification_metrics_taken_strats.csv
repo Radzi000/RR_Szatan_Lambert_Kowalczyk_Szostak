@@ -1,0 +1,6 @@
+strategy,config_source,optimizer,asset,asset_class,frequency,split,cost_bps,gross_total_return,net_total_return,annualized_return,annualized_volatility,net_sharpe,sortino,max_drawdown,calmar,hit_rate,turnover,total_transaction_cost,trade_count,average_trade_pnl,exposure_time
+Strategy0 / Baseline,taken_fixed,,SPY,equities,5min,full,1.0,2.168078,0.179678,0.84326,64.673123,0.522142,0.910153,-6.114425,0.137913,0.3,0.043114,1988.400484,50,3.59356,0.234605
+Strategy1 / Asymmetric Intervals,taken_fixed,,SPY,equities,5min,full,1.0,1.364595,-1.358274,-6.198147,46.481154,-1.15877,-2.840862,-6.368801,-0.973205,0.231884,0.059039,2722.868544,69,-19.685129,0.196878
+Strategy2 / EMA Filter,taken_fixed,,SPY,equities,5min,full,1.0,1.608777,-0.371443,-1.72567,64.223277,-0.047121,-0.081566,-6.15526,-0.280357,0.3,0.042936,1980.219716,50,-7.428864,0.233304
+Strategy3 / Exit Confirmation,taken_fixed,,SPY,equities,5min,full,1.0,4.782951,2.974922,14.698897,66.617849,3.587592,7.873062,-6.625904,2.218399,0.333333,0.039203,1808.028332,45,66.109383,0.255421
+Strategy4 / EMA + Confirmation,taken_fixed,,SPY,equities,5min,full,1.0,4.207504,2.407323,11.771128,66.231969,2.990125,6.523896,-6.625904,1.776532,0.333333,0.039033,1800.180861,45,53.496075,0.25412

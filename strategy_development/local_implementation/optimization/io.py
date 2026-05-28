@@ -31,10 +31,10 @@ def write_convergence_plot(search_results: pd.DataFrame, output_path: Path) -> P
     if not search_results.empty:
         grouped = (
             search_results.sort_values("iteration")
-            .groupby(["strategy", "optimizer", "iteration"], as_index=False)["train_sharpe"]
+            .groupby(["strategy", "optimizer", "iteration"], as_index=False)["train_net_sharpe"]
             .max()
         )
-        grouped["best_so_far"] = grouped.groupby(["strategy", "optimizer"])["train_sharpe"].cummax()
+        grouped["best_so_far"] = grouped.groupby(["strategy", "optimizer"])["train_net_sharpe"].cummax()
         for (strategy, optimizer), chunk in grouped.groupby(["strategy", "optimizer"]):
             ax.plot(
                 chunk["iteration"],
@@ -44,7 +44,7 @@ def write_convergence_plot(search_results: pd.DataFrame, output_path: Path) -> P
             )
     ax.set_title("Optimization Convergence")
     ax.set_xlabel("Iteration")
-    ax.set_ylabel("Best-So-Far Train Sharpe")
+    ax.set_ylabel("Best-So-Far Train Net Sharpe")
     ax.grid(True, linestyle="--", alpha=0.3)
     ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()
@@ -58,22 +58,22 @@ def write_train_validation_plot(comparison: pd.DataFrame, output_path: Path) -> 
     if not comparison.empty:
         plot_frame = (
             comparison.groupby(["strategy", "optimizer"], as_index=False)[
-                ["baseline_validation_sharpe", "optimized_validation_sharpe"]
+                ["baseline_validation_net_sharpe", "optimized_validation_net_sharpe"]
             ]
             .mean()
         )
         x = range(len(plot_frame))
         ax.bar(
             [value - 0.2 for value in x],
-            plot_frame["baseline_validation_sharpe"],
+            plot_frame["baseline_validation_net_sharpe"],
             width=0.4,
-            label="Baseline validation Sharpe",
+            label="Baseline validation net Sharpe",
         )
         ax.bar(
             [value + 0.2 for value in x],
-            plot_frame["optimized_validation_sharpe"],
+            plot_frame["optimized_validation_net_sharpe"],
             width=0.4,
-            label="Optimized validation Sharpe",
+            label="Optimized validation net Sharpe",
         )
         ax.set_xticks(list(x))
         ax.set_xticklabels(
@@ -81,8 +81,8 @@ def write_train_validation_plot(comparison: pd.DataFrame, output_path: Path) -> 
             rotation=20,
             ha="right",
         )
-    ax.set_title("Train/Validation Sharpe Comparison")
-    ax.set_ylabel("Validation Sharpe")
+    ax.set_title("Train/Validation Net Sharpe Comparison")
+    ax.set_ylabel("Validation Net Sharpe")
     ax.grid(True, linestyle="--", axis="y", alpha=0.3)
     ax.legend()
     fig.tight_layout()

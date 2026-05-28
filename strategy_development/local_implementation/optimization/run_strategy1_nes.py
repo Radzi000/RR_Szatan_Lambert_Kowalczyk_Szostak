@@ -5,7 +5,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .common import TABLE_FILENAMES, add_common_args, default_strategy_configs, parse_asset_list, run_strategy_optimization
+from .common import (
+    TABLE_FILENAMES,
+    add_common_args,
+    build_cost_config_from_args,
+    default_strategy_configs,
+    parse_asset_list,
+    run_strategy_optimization,
+)
 from .io import ensure_output_dirs, write_csv
 
 
@@ -23,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
         smoke=args.smoke,
         output_dir=output_dir,
         assets=parse_asset_list(args.assets),
+        cost_config=build_cost_config_from_args(args),
     )
     for key, frame in results.items():
         write_csv(tables_dir / TABLE_FILENAMES[key], frame)

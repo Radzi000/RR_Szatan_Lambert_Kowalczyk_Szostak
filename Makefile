@@ -1,4 +1,4 @@
-.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke report-quarto reproduce docker-build docker-test docker-reproduce clean
+.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report-quarto reproduce docker-build docker-test docker-reproduce clean
 
 PYTHON ?= python
 PIP ?= pip
@@ -41,6 +41,10 @@ optimize:  ## Run the full Workstream C train/validation optimization suite
 
 optimize-smoke:  ## Run the small smoke-mode Workstream C optimization suite
 	$(PYTHON) -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke
+
+results:  ## Generate cost-aware baseline and optimization result artifacts
+	$(PYTHON) -m strategy_development.local_implementation.run_fixed_15m_experiments
+	$(PYTHON) -m strategy_development.local_implementation.optimization.run_all_optimizations
 
 report-quarto:  ## Render the optional Quarto Workstream C report if Quarto is installed
 	quarto render reports/workstream_c_optimization_report.qmd

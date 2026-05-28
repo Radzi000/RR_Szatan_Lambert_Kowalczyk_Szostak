@@ -15,6 +15,12 @@ from preprocessing import materialize_processed_data
 from preprocessing.loader import load_split
 
 from ..backtest.engine import BacktestEngine, BacktestResult
+from ..costs import (
+    DEFAULT_COST_CONFIG,
+    TransactionCostConfig,
+    add_cost_args,
+    cost_config_from_args,
+)
 from ..reproduce import PROJECT_ROOT
 from ..strategy_specs import STRATEGY_SPECS, StrategySpec
 from .io import params_to_json
@@ -78,6 +84,7 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
         default=str(DEFAULT_OUTPUT_DIR),
         help="Directory where optimization outputs will be written.",
     )
+    add_cost_args(parser)
 
 
 def _discover_assets(assets: set[str] | None, smoke: bool) -> list[tuple[str, str]]:
@@ -154,8 +161,37 @@ def run_backtest_for_params(
     daily_data: pd.DataFrame,
     minute_data: pd.DataFrame,
 ) -> tuple[BacktestResult, MetricBundle]:
-    engine = BacktestEngine(initial_capital=100_000.0, commission_per_share=0.005)
-    result = engine.run(strategy_cls(**params), daily_data, minute_data)
+    return run_backtest_for_params_with_costs(
+        strategy_cls,
+        params,
+        daily_data,
+        minute_data,
+        asset_class="default",
+        cost_config=DEFAULT_COST_CONFIG,
+    )
+
+
+def build_cost_config_from_args(args: argparse.Namespace) -> TransactionCostConfig:
+    return cost_config_from_args(args)
+
+
+def run_backtest_for_params_with_costs(
+    strategy_cls: type,
+    params: dict[str, Any],
+    daily_data: pd.DataFrame,
+    minute_data: pd.DataFrame,
+    *,
+    asset_class: str,
+    cost_config: TransactionCostConfig,
+) -> tuple[BacktestResult, MetricBundle]:
+    engine = BacktestEngine(initial_capital=100_000.0, cost_config=cost_config)
+    result = engine.run(
+        strategy_cls(**params),
+        daily_data,
+        minute_data,
+        asset_class=asset_class,
+        frequency="15min",
+    )
     return result, compute_metric_bundle(result, minute_data)
 
 
@@ -190,6 +226,7 @@ def _candidate_row(
     candidate_id: int,
     params: dict[str, Any],
     metrics: MetricBundle,
+    cost_bps: float,
     valid: bool,
 ) -> dict[str, object]:
     return {
@@ -201,11 +238,17 @@ def _candidate_row(
         "iteration": iteration,
         "candidate_id": candidate_id,
         "params_json": params_to_json(params),
-        "train_sharpe": round(metrics.sharpe, 6),
-        "train_return": round(metrics.total_return, 6),
+        "train_net_sharpe": round(metrics.net_sharpe, 6),
+        "train_gross_sharpe": round(metrics.gross_sharpe, 6),
+        "train_sharpe": round(metrics.net_sharpe, 6),
+        "train_net_return": round(metrics.net_total_return, 6),
+        "train_return": round(metrics.net_total_return, 6),
         "train_volatility": round(metrics.annualized_volatility, 6),
         "train_max_drawdown": round(metrics.max_drawdown, 6),
         "train_trade_count": int(metrics.trade_count),
+        "train_total_cost": round(metrics.total_transaction_cost, 6),
+        "train_turnover": round(metrics.turnover, 6),
+        "cost_bps": round(float(cost_bps), 6),
         "valid": bool(valid),
     }
 
@@ -215,27 +258,37 @@ def _verification_row(
     strategy: str,
     optimizer: str,
     asset: str,
+    asset_class: str,
     split: str,
     metrics: MetricBundle,
     config_source: str,
+    cost_bps: float,
 ) -> dict[str, object]:
     row = {
         "strategy": strategy,
         "optimizer": optimizer,
         "asset": asset,
+        "asset_class": asset_class,
+        "frequency": "15min",
         "split": split,
-        "total_return": round(metrics.total_return, 6),
+        "gross_total_return": round(metrics.gross_total_return, 6),
+        "net_total_return": round(metrics.net_total_return, 6),
+        "total_return": round(metrics.net_total_return, 6),
         "annualized_return": round(metrics.annualized_return, 6),
         "annualized_volatility": round(metrics.annualized_volatility, 6),
-        "sharpe": round(metrics.sharpe, 6),
+        "gross_sharpe": round(metrics.gross_sharpe, 6),
+        "net_sharpe": round(metrics.net_sharpe, 6),
+        "sharpe": round(metrics.net_sharpe, 6),
         "sortino": round(metrics.sortino, 6),
         "max_drawdown": round(metrics.max_drawdown, 6),
         "calmar": round(metrics.calmar, 6),
         "hit_rate": round(metrics.hit_rate, 6),
         "turnover": round(metrics.turnover, 6),
+        "total_transaction_cost": round(metrics.total_transaction_cost, 6),
         "trade_count": int(metrics.trade_count),
         "average_trade_pnl": round(metrics.average_trade_pnl, 6),
         "exposure_time": round(metrics.exposure_time, 6),
+        "cost_bps": round(float(cost_bps), 6),
     }
     row["config_source"] = config_source
     return row
@@ -246,6 +299,8 @@ def _evaluate_candidates_on_validation(
     strategy_cls: type,
     validation_daily: pd.DataFrame,
     validation_minute: pd.DataFrame,
+    asset_class: str,
+    cost_config: TransactionCostConfig,
 ) -> list[tuple[dict[str, Any], MetricBundle]]:
     evaluated: list[tuple[dict[str, Any], MetricBundle]] = []
     seen: set[str] = set()
@@ -254,7 +309,14 @@ def _evaluate_candidates_on_validation(
         if encoded in seen:
             continue
         seen.add(encoded)
-        _, metrics = run_backtest_for_params(strategy_cls, params, validation_daily, validation_minute)
+        _, metrics = run_backtest_for_params_with_costs(
+            strategy_cls,
+            params,
+            validation_daily,
+            validation_minute,
+            asset_class=asset_class,
+            cost_config=cost_config,
+        )
         evaluated.append((params, metrics))
     return evaluated
 
@@ -262,8 +324,8 @@ def _evaluate_candidates_on_validation(
 def _select_by_validation(candidates: list[tuple[dict[str, Any], MetricBundle]]) -> tuple[dict[str, Any], MetricBundle]:
     valid = [item for item in candidates if _valid_metric_bundle(item[1])]
     if valid:
-        return max(valid, key=lambda item: (item[1].sharpe, item[1].total_return))
-    return max(candidates, key=lambda item: item[1].sharpe)
+        return max(valid, key=lambda item: (item[1].net_sharpe, item[1].net_total_return))
+    return max(candidates, key=lambda item: item[1].net_sharpe)
 
 
 def _run_nes(
@@ -279,6 +341,7 @@ def _run_nes(
     optimizer_label: str,
     asset: str,
     asset_class: str,
+    cost_config: TransactionCostConfig,
 ) -> tuple[list[dict[str, object]], list[dict[str, Any]]]:
     rng = np.random.default_rng(seed)
     bounds_low = np.array(param_space.bounds_low, dtype=float)
@@ -305,9 +368,16 @@ def _run_nes(
             normalized = np.clip(mean + sigma * epsilon, 0.0, 1.0)
             raw = bounds_low + normalized * ranges
             params = param_space.clip_and_round(raw.tolist())
-            _, metrics = run_backtest_for_params(strategy_cls, params, daily_data, minute_data)
+            _, metrics = run_backtest_for_params_with_costs(
+                strategy_cls,
+                params,
+                daily_data,
+                minute_data,
+                asset_class=asset_class,
+                cost_config=cost_config,
+            )
             valid = _valid_metric_bundle(metrics)
-            reward = metrics.sharpe if valid else -1e6
+            reward = metrics.net_sharpe if valid else -1e6
             rewards.append(reward)
             candidate_params.append(params)
             search_rows.append(
@@ -320,6 +390,7 @@ def _run_nes(
                     candidate_id=candidate_id,
                     params=params,
                     metrics=metrics,
+                    cost_bps=cost_config.cost_bps_for(asset_class),
                     valid=valid,
                 )
             )
@@ -349,6 +420,7 @@ def _run_cmaes(
     optimizer_label: str,
     asset: str,
     asset_class: str,
+    cost_config: TransactionCostConfig,
 ) -> tuple[list[dict[str, object]], list[dict[str, Any]]]:
     bounds_low = np.array(param_space.bounds_low, dtype=float)
     bounds_high = np.array(param_space.bounds_high, dtype=float)
@@ -378,9 +450,16 @@ def _run_cmaes(
                 vector = optimizer.ask()
                 raw = bounds_low + np.clip(vector, 0.0, 1.0) * ranges
                 params = param_space.clip_and_round(raw.tolist())
-                _, metrics = run_backtest_for_params(strategy_cls, params, daily_data, minute_data)
+                _, metrics = run_backtest_for_params_with_costs(
+                    strategy_cls,
+                    params,
+                    daily_data,
+                    minute_data,
+                    asset_class=asset_class,
+                    cost_config=cost_config,
+                )
                 valid = _valid_metric_bundle(metrics)
-                reward = metrics.sharpe if valid else -1e6
+                reward = metrics.net_sharpe if valid else -1e6
                 candidate_params.append(params)
                 search_rows.append(
                     _candidate_row(
@@ -392,6 +471,7 @@ def _run_cmaes(
                         candidate_id=candidate_id,
                         params=params,
                         metrics=metrics,
+                        cost_bps=cost_config.cost_bps_for(asset_class),
                         valid=valid,
                     )
                 )
@@ -414,9 +494,16 @@ def _run_cmaes(
                 vector = np.clip(mean + sigma * step, 0.0, 1.0)
                 raw = bounds_low + vector * ranges
                 params = param_space.clip_and_round(raw.tolist())
-                _, metrics = run_backtest_for_params(strategy_cls, params, daily_data, minute_data)
+                _, metrics = run_backtest_for_params_with_costs(
+                    strategy_cls,
+                    params,
+                    daily_data,
+                    minute_data,
+                    asset_class=asset_class,
+                    cost_config=cost_config,
+                )
                 valid = _valid_metric_bundle(metrics)
-                reward = metrics.sharpe if valid else -1e6
+                reward = metrics.net_sharpe if valid else -1e6
                 vectors.append(vector)
                 rewards.append(reward)
                 metrics_by_vector.append((params, metrics, valid))
@@ -431,6 +518,7 @@ def _run_cmaes(
                         candidate_id=candidate_id,
                         params=params,
                         metrics=metrics,
+                        cost_bps=cost_config.cost_bps_for(asset_class),
                         valid=valid,
                     )
                 )
@@ -459,6 +547,7 @@ def run_strategy_optimization(
     smoke: bool,
     output_dir: Path,
     assets: set[str] | None = None,
+    cost_config: TransactionCostConfig = DEFAULT_COST_CONFIG,
 ) -> dict[str, pd.DataFrame]:
     """Run optimization for one strategy across selected 15-minute assets."""
     materialize_processed_data()
@@ -484,11 +573,21 @@ def run_strategy_optimization(
         train_daily, train_minute = split_data["train"]
         validation_daily, validation_minute = split_data["validation"]
 
-        baseline_train_result, baseline_train_metrics = run_backtest_for_params(
-            strategy_cls, strategy_spec.params, train_daily, train_minute
+        baseline_train_result, baseline_train_metrics = run_backtest_for_params_with_costs(
+            strategy_cls,
+            strategy_spec.params,
+            train_daily,
+            train_minute,
+            asset_class=asset_class,
+            cost_config=cost_config,
         )
-        baseline_validation_result, baseline_validation_metrics = run_backtest_for_params(
-            strategy_cls, strategy_spec.params, validation_daily, validation_minute
+        baseline_validation_result, baseline_validation_metrics = run_backtest_for_params_with_costs(
+            strategy_cls,
+            strategy_spec.params,
+            validation_daily,
+            validation_minute,
+            asset_class=asset_class,
+            cost_config=cost_config,
         )
         verification_rows.extend(
             [
@@ -496,17 +595,21 @@ def run_strategy_optimization(
                     strategy=strategy_spec.label,
                     optimizer=config.optimizer,
                     asset=asset,
+                    asset_class=asset_class,
                     split="train",
                     metrics=baseline_train_metrics,
                     config_source="baseline",
+                    cost_bps=cost_config.cost_bps_for(asset_class),
                 ),
                 _verification_row(
                     strategy=strategy_spec.label,
                     optimizer=config.optimizer,
                     asset=asset,
+                    asset_class=asset_class,
                     split="validation",
                     metrics=baseline_validation_metrics,
                     config_source="baseline",
+                    cost_bps=cost_config.cost_bps_for(asset_class),
                 ),
             ]
         )
@@ -524,6 +627,7 @@ def run_strategy_optimization(
                 optimizer_label=config.optimizer,
                 asset=asset,
                 asset_class=asset_class,
+                cost_config=cost_config,
             )
         else:
             asset_search_rows, candidate_params = _run_cmaes(
@@ -538,17 +642,33 @@ def run_strategy_optimization(
                 optimizer_label=config.optimizer,
                 asset=asset,
                 asset_class=asset_class,
+                cost_config=cost_config,
             )
         search_rows.extend(asset_search_rows)
         validation_candidates = _evaluate_candidates_on_validation(
-            candidate_params, strategy_cls, validation_daily, validation_minute
+            candidate_params,
+            strategy_cls,
+            validation_daily,
+            validation_minute,
+            asset_class,
+            cost_config,
         )
         selected_params, selected_validation_metrics = _select_by_validation(validation_candidates)
-        optimized_train_result, optimized_train_metrics = run_backtest_for_params(
-            strategy_cls, selected_params, train_daily, train_minute
+        optimized_train_result, optimized_train_metrics = run_backtest_for_params_with_costs(
+            strategy_cls,
+            selected_params,
+            train_daily,
+            train_minute,
+            asset_class=asset_class,
+            cost_config=cost_config,
         )
-        optimized_validation_result, optimized_validation_metrics = run_backtest_for_params(
-            strategy_cls, selected_params, validation_daily, validation_minute
+        optimized_validation_result, optimized_validation_metrics = run_backtest_for_params_with_costs(
+            strategy_cls,
+            selected_params,
+            validation_daily,
+            validation_minute,
+            asset_class=asset_class,
+            cost_config=cost_config,
         )
         verification_rows.extend(
             [
@@ -556,17 +676,21 @@ def run_strategy_optimization(
                     strategy=strategy_spec.label,
                     optimizer=config.optimizer,
                     asset=asset,
+                    asset_class=asset_class,
                     split="train",
                     metrics=optimized_train_metrics,
                     config_source="optimized",
+                    cost_bps=cost_config.cost_bps_for(asset_class),
                 ),
                 _verification_row(
                     strategy=strategy_spec.label,
                     optimizer=config.optimizer,
                     asset=asset,
+                    asset_class=asset_class,
                     split="validation",
                     metrics=optimized_validation_metrics,
                     config_source="optimized",
+                    cost_bps=cost_config.cost_bps_for(asset_class),
                 ),
             ]
         )
@@ -578,16 +702,27 @@ def run_strategy_optimization(
                 "asset": asset,
                 "asset_class": asset_class,
                 "frequency": "15min",
-                "selected_by": "validation_sharpe",
+                "selected_by": "validation_net_sharpe",
                 "params_json": params_to_json(selected_params),
-                "train_sharpe": round(optimized_train_metrics.sharpe, 6),
-                "validation_sharpe": round(selected_validation_metrics.sharpe, 6),
-                "train_return": round(optimized_train_metrics.total_return, 6),
-                "validation_return": round(selected_validation_metrics.total_return, 6),
+                "train_gross_sharpe": round(optimized_train_metrics.gross_sharpe, 6),
+                "train_net_sharpe": round(optimized_train_metrics.net_sharpe, 6),
+                "validation_net_sharpe": round(selected_validation_metrics.net_sharpe, 6),
+                "train_sharpe": round(optimized_train_metrics.net_sharpe, 6),
+                "validation_sharpe": round(selected_validation_metrics.net_sharpe, 6),
+                "train_gross_return": round(optimized_train_metrics.gross_total_return, 6),
+                "train_net_return": round(optimized_train_metrics.net_total_return, 6),
+                "validation_net_return": round(selected_validation_metrics.net_total_return, 6),
+                "train_return": round(optimized_train_metrics.net_total_return, 6),
+                "validation_return": round(selected_validation_metrics.net_total_return, 6),
                 "train_max_drawdown": round(optimized_train_metrics.max_drawdown, 6),
                 "validation_max_drawdown": round(selected_validation_metrics.max_drawdown, 6),
                 "train_trade_count": int(optimized_train_metrics.trade_count),
                 "validation_trade_count": int(selected_validation_metrics.trade_count),
+                "train_total_cost": round(optimized_train_metrics.total_transaction_cost, 6),
+                "validation_total_cost": round(selected_validation_metrics.total_transaction_cost, 6),
+                "train_turnover": round(optimized_train_metrics.turnover, 6),
+                "validation_turnover": round(selected_validation_metrics.turnover, 6),
+                "cost_bps": round(float(cost_config.cost_bps_for(asset_class)), 6),
             }
         )
 
@@ -597,28 +732,42 @@ def run_strategy_optimization(
                 "optimizer": config.optimizer,
                 "asset": asset,
                 "asset_class": asset_class,
-                "baseline_train_sharpe": round(baseline_train_metrics.sharpe, 6),
-                "optimized_train_sharpe": round(optimized_train_metrics.sharpe, 6),
-                "baseline_validation_sharpe": round(baseline_validation_metrics.sharpe, 6),
-                "optimized_validation_sharpe": round(optimized_validation_metrics.sharpe, 6),
-                "baseline_train_return": round(baseline_train_metrics.total_return, 6),
-                "optimized_train_return": round(optimized_train_metrics.total_return, 6),
-                "baseline_validation_return": round(baseline_validation_metrics.total_return, 6),
-                "optimized_validation_return": round(optimized_validation_metrics.total_return, 6),
+                "baseline_train_net_sharpe": round(baseline_train_metrics.net_sharpe, 6),
+                "optimized_train_net_sharpe": round(optimized_train_metrics.net_sharpe, 6),
+                "baseline_validation_net_sharpe": round(baseline_validation_metrics.net_sharpe, 6),
+                "optimized_validation_net_sharpe": round(optimized_validation_metrics.net_sharpe, 6),
+                "baseline_train_sharpe": round(baseline_train_metrics.net_sharpe, 6),
+                "optimized_train_sharpe": round(optimized_train_metrics.net_sharpe, 6),
+                "baseline_validation_sharpe": round(baseline_validation_metrics.net_sharpe, 6),
+                "optimized_validation_sharpe": round(optimized_validation_metrics.net_sharpe, 6),
+                "baseline_train_return": round(baseline_train_metrics.net_total_return, 6),
+                "optimized_train_return": round(optimized_train_metrics.net_total_return, 6),
+                "baseline_validation_return": round(baseline_validation_metrics.net_total_return, 6),
+                "optimized_validation_return": round(optimized_validation_metrics.net_total_return, 6),
                 "baseline_validation_max_drawdown": round(
                     baseline_validation_metrics.max_drawdown, 6
                 ),
                 "optimized_validation_max_drawdown": round(
                     optimized_validation_metrics.max_drawdown, 6
                 ),
-                "improvement_validation_sharpe": round(
-                    optimized_validation_metrics.sharpe - baseline_validation_metrics.sharpe,
+                "improvement_validation_net_sharpe": round(
+                    optimized_validation_metrics.net_sharpe - baseline_validation_metrics.net_sharpe,
                     6,
                 ),
+                "improvement_validation_sharpe": round(
+                    optimized_validation_metrics.net_sharpe - baseline_validation_metrics.net_sharpe,
+                    6,
+                ),
+                "total_cost_difference": round(
+                    optimized_validation_metrics.total_transaction_cost
+                    - baseline_validation_metrics.total_transaction_cost,
+                    6,
+                ),
+                "cost_bps": round(float(cost_config.cost_bps_for(asset_class)), 6),
                 "overfit_warning": overfit_warning(
-                    baseline_validation_sharpe=baseline_validation_metrics.sharpe,
-                    optimized_train_sharpe=optimized_train_metrics.sharpe,
-                    optimized_validation_sharpe=optimized_validation_metrics.sharpe,
+                    baseline_validation_net_sharpe=baseline_validation_metrics.net_sharpe,
+                    optimized_train_net_sharpe=optimized_train_metrics.net_sharpe,
+                    optimized_validation_net_sharpe=optimized_validation_metrics.net_sharpe,
                 ),
             }
         )

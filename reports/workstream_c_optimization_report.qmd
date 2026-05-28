@@ -16,6 +16,7 @@ five local intraday momentum strategies reproduced in
 - Strategies 1-3 use NES.
 - Strategies 4-5 use CMA-ES.
 - Optimization uses the train split only.
+- Transaction costs are applied inside the backtest and optimization loop.
 - Validation is used only for post-fit verification and parameter selection.
 - Test/OOS is reserved for a later final evaluation stage.
 
@@ -40,8 +41,18 @@ The aggregate optimization runner writes:
 - `outputs/tables/selected_params.csv`
 - `outputs/tables/train_validation_comparison.csv`
 - `outputs/tables/optimization_verification_metrics.csv`
+- `outputs/tables/equity_curves_our_strats.csv`
+- `outputs/tables/drawdowns_our_strats.csv`
+- `outputs/tables/equity_drawdown_our_strats_aggregated.csv`
+- `outputs/tables/verification_metrics_our_strats.csv`
 - `outputs/figures/optimization_convergence.png`
 - `outputs/figures/train_validation_sharpe_comparison.png`
+- `outputs/figures/equity_curves_our_strats.png`
+- `outputs/figures/drawdowns_our_strats.png`
+- `outputs/figures/equity_curves_our_strats_train.png`
+- `outputs/figures/equity_curves_our_strats_validation.png`
+- `outputs/figures/drawdowns_our_strats_train.png`
+- `outputs/figures/drawdowns_our_strats_validation.png`
 
 ## Commands
 
@@ -75,15 +86,18 @@ quarto render reports/workstream_c_optimization_report.qmd
 
 Optimization writes train and validation metrics including:
 
-- total return
+- gross total return
+- net total return
 - annualized return
 - annualized volatility
-- Sharpe
+- gross Sharpe
+- net Sharpe
 - Sortino
 - max drawdown
 - Calmar
 - hit rate
 - turnover
+- total transaction cost
 - trade count
 - average trade PnL
 - exposure time
@@ -91,6 +105,9 @@ Optimization writes train and validation metrics including:
 ## Notes
 
 - The optimization stage does not touch the test split.
+- Parameter selection is based on validation net Sharpe, not gross Sharpe.
+- Train and validation charts are emitted separately, and drawdown is computed
+  per strategy/asset/split curve before any aggregation.
 - The canonical `docker compose up --build reproduce` baseline remains focused on
   the faster 5-minute SPY reproduction.
 - The optional optimization service is smoke-mode only to keep Docker runtime

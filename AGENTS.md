@@ -41,6 +41,10 @@ If Docker is available, keep the Docker command passing too.
 - Treat `strategy_development/local_implementation/` as the authoritative local
   implementation.
 - Do not change strategy behavior unless the task explicitly requires it.
+- Keep transaction costs centralized in
+  `strategy_development/local_implementation/costs.py`.
+- Baseline, optimization, and reported metrics must stay net of transaction
+  costs unless a table explicitly includes separate gross columns.
 
 ## Optimization Guardrails
 
@@ -91,6 +95,13 @@ If Docker is available, keep the Docker command passing too.
   `optimization_verification_metrics.csv`,
   `optimization_convergence.png`,
   and `train_validation_sharpe_comparison.png`.
+- Cost-aware comparison artifacts should also emit:
+  `verification_metrics_taken_strats.csv`,
+  `verification_metrics_our_strats.csv`,
+  `equity_curves_taken_strats.png`,
+  `drawdowns_taken_strats.png`,
+  `equity_curves_our_strats.png`,
+  and `drawdowns_our_strats.png`.
 
 ## Documentation And Tests
 

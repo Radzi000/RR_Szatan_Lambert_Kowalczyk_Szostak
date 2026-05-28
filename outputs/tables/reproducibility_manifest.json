@@ -39,11 +39,16 @@
   ],
   "generated_outputs": [
     "outputs/figures/drawdowns.png",
+    "outputs/figures/drawdowns_taken_strats.png",
     "outputs/figures/equity_curves.png",
+    "outputs/figures/equity_curves_taken_strats.png",
     "outputs/report/final_report.md",
+    "outputs/tables/drawdowns_taken_strats.csv",
+    "outputs/tables/equity_curves_taken_strats.csv",
     "outputs/tables/reproducibility_manifest.json",
     "outputs/tables/strategy_summary.csv",
-    "outputs/tables/strategy_summary.md"
+    "outputs/tables/strategy_summary.md",
+    "outputs/tables/verification_metrics_taken_strats.csv"
   ],
   "environment": {
     "cwd": "/app",
@@ -52,5 +57,11 @@
     "seed": 0,
     "matplotlib_backend": "Agg",
     "timezone": "not-set"
+  },
+  "transaction_costs_bps": {
+    "equity_cost_bps": 1.0,
+    "commodity_cost_bps": 1.5,
+    "crypto_cost_bps": 4.0,
+    "default_cost_bps": 2.0
   }
 }

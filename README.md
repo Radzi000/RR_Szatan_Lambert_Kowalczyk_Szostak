@@ -115,8 +115,18 @@ runner:
 - `outputs/tables/selected_params.csv`
 - `outputs/tables/train_validation_comparison.csv`
 - `outputs/tables/optimization_verification_metrics.csv`
+- `outputs/tables/verification_metrics_our_strats.csv`
+- `outputs/tables/equity_curves_our_strats.csv`
+- `outputs/tables/drawdowns_our_strats.csv`
+- `outputs/tables/equity_drawdown_our_strats_aggregated.csv`
 - `outputs/figures/optimization_convergence.png`
 - `outputs/figures/train_validation_sharpe_comparison.png`
+- `outputs/figures/equity_curves_our_strats.png`
+- `outputs/figures/drawdowns_our_strats.png`
+- `outputs/figures/equity_curves_our_strats_train.png`
+- `outputs/figures/equity_curves_our_strats_validation.png`
+- `outputs/figures/drawdowns_our_strats_train.png`
+- `outputs/figures/drawdowns_our_strats_validation.png`
 
 ## Strategy Variants Included
 
@@ -186,6 +196,7 @@ make preprocess
 make fixed-15m
 make optimize
 make optimize-smoke
+make results
 make reproduce
 ```
 
@@ -198,6 +209,7 @@ Main targets:
 - `make fixed-15m` runs the deterministic fixed-parameter 15-minute baseline suite
 - `make optimize` runs the Workstream C train/validation optimization suite
 - `make optimize-smoke` runs a faster smoke-mode Workstream C optimization suite
+- `make results` runs the full cost-aware baseline plus optimization result generation
 - `make reproduce` runs `python -m strategy_development.local_implementation.reproduce`
 - `make test` runs the offline pytest suite
 - `make docker-reproduce` runs `docker compose up --build reproduce`
@@ -246,6 +258,21 @@ It writes:
 - `outputs/tables/fixed_15m_trade_logs.csv`
 - `outputs/tables/fixed_15m_train_validation_test_summary.csv`
 
+Those baseline outputs are now net of centralized transaction costs by default.
+The default per-side assumptions are:
+
+- equities and equity ETFs: `1.0` bps
+- commodity ETFs: `1.5` bps
+- crypto: `4.0` bps
+- fallback: `2.0` bps
+
+The same cost model is used inside:
+
+- the 5-minute SPY baseline reproduce path
+- the 15-minute fixed baseline runner
+- the Workstream C train objective
+- the Workstream C validation verification outputs
+
 Workstream C optimization is intentionally separate from the canonical
 `reproduce` command because the full optimization pass is slower. The aggregate
 runner writes:
@@ -254,8 +281,13 @@ runner writes:
 - `outputs/tables/selected_params.csv`
 - `outputs/tables/train_validation_comparison.csv`
 - `outputs/tables/optimization_verification_metrics.csv`
+- `outputs/tables/equity_drawdown_our_strats_aggregated.csv`
 - `outputs/figures/optimization_convergence.png`
 - `outputs/figures/train_validation_sharpe_comparison.png`
+- `outputs/figures/equity_curves_our_strats_train.png`
+- `outputs/figures/equity_curves_our_strats_validation.png`
+- `outputs/figures/drawdowns_our_strats_train.png`
+- `outputs/figures/drawdowns_our_strats_validation.png`
 
 Optimization commands:
 
@@ -282,10 +314,12 @@ Workstream C discipline:
 
 - NES is used for Strategy0, Strategy1, and Strategy2
 - CMA-ES is used for Strategy3 and Strategy4
-- optimization uses the train split only
-- validation is used only for verification and parameter selection
+- optimization uses cost-adjusted train net Sharpe only
+- validation is used only for cost-adjusted verification and parameter selection
 - test/OOS is reserved for a later final evaluation stage
 - the optimization stage does not use QuantConnect or live downloads
+- train and validation charts are generated separately so split equity curves
+  are not misleadingly stitched into one timeline
 
 Clean rebuild and rerun:
 
@@ -370,6 +404,8 @@ Workstream C should consume these deterministic A/B outputs:
 - `outputs/tables/selected_params.csv`
 - `outputs/tables/train_validation_comparison.csv`
 - `outputs/tables/optimization_verification_metrics.csv`
+- `outputs/tables/verification_metrics_taken_strats.csv`
+- `outputs/tables/verification_metrics_our_strats.csv`
 
 Rules for C:
 
@@ -377,6 +413,7 @@ Rules for C:
 - use validation only for model/parameter selection
 - keep test for final OOS evaluation only
 - do not add live downloads or QuantConnect dependencies
+- keep transaction costs inside the backtest loop and optimize net metrics
 
 Quarto report skeleton:
 
@@ -404,6 +441,8 @@ AI usage is disclosed in [AI_USAGE.md](/C:/Users/Rados/RR/AI_USAGE.md).
 - The full Workstream C optimization run is intentionally separate from the
   canonical Docker reproduce workflow because it is materially slower than the
   baseline smoke service.
+- Daily data is excluded from the new cost-aware taken/our strategy curve plots
+  because the current strategy logic is intraday-specific.
 - Intraday history is limited to the committed files, so the project favors
   deterministic reproducibility over unrestricted data coverage.
 

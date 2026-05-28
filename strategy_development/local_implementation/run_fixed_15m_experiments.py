@@ -11,6 +11,7 @@ from preprocessing import discover_data_files, materialize_processed_data
 from preprocessing.loader import load_all_splits
 
 from .backtest.engine import BacktestEngine, BacktestResult
+from .costs import DEFAULT_COST_CONFIG, TransactionCostConfig, add_cost_args, cost_config_from_args
 from .reproduce import PROJECT_ROOT
 from .strategy_specs import STRATEGY_SPECS
 
@@ -21,7 +22,20 @@ TABLE_NAMES = {
     "trades": "fixed_15m_trade_logs.csv",
     "split_summary": "fixed_15m_train_validation_test_summary.csv",
 }
-RETURN_COLUMNS = ["asset", "asset_class", "strategy", "split", "timestamp", "equity", "return_pct"]
+RETURN_COLUMNS = [
+    "asset",
+    "asset_class",
+    "strategy",
+    "split",
+    "timestamp",
+    "gross_equity",
+    "net_equity",
+    "gross_return_pct",
+    "net_return_pct",
+    "turnover",
+    "transaction_cost",
+    "cumulative_transaction_cost",
+]
 TRADE_COLUMNS = [
     "asset",
     "asset_class",
@@ -34,8 +48,14 @@ TRADE_COLUMNS = [
     "entry_price",
     "exit_price",
     "leverage",
-    "pnl",
-    "return_pct",
+    "gross_pnl",
+    "net_pnl",
+    "gross_return_pct",
+    "net_return_pct",
+    "transaction_cost",
+    "turnover",
+    "cumulative_transaction_cost",
+    "cost_bps",
 ]
 
 
@@ -96,14 +116,22 @@ def _result_summary_row(
         "asset_class": asset_class,
         "strategy": strategy,
         "split": split,
+        "final_gross_equity": round(summary["final_gross_equity"], 2),
         "final_equity": round(summary["final_equity"], 2),
-        "total_return_pct": round(summary["total_return_pct"], 6),
-        "sharpe_ratio": round(summary["sharpe_ratio"], 6),
+        "gross_total_return": round(summary["gross_total_return_pct"], 6),
+        "net_total_return": round(summary["net_total_return_pct"], 6),
+        "total_return_pct": round(summary["net_total_return_pct"], 6),
+        "gross_sharpe": round(summary["gross_sharpe_ratio"], 6),
+        "net_sharpe": round(summary["net_sharpe_ratio"], 6),
+        "sharpe_ratio": round(summary["net_sharpe_ratio"], 6),
         "max_drawdown_pct": round(summary["max_drawdown_pct"], 6),
         "num_trades": int(summary["num_trades"]),
         "win_rate": round(summary["win_rate"], 6),
         "avg_win_pct": round(summary["avg_win_pct"], 6),
         "avg_loss_pct": round(summary["avg_loss_pct"], 6),
+        "cost_bps": round(summary["cost_bps"], 6),
+        "total_transaction_cost": round(summary["total_transaction_cost"], 6),
+        "total_turnover": round(summary["total_turnover"], 6),
         "signal_count": len(result.signals),
     }
 
@@ -116,20 +144,24 @@ def _returns_rows(
     strategy: str,
     split: str,
 ) -> list[dict[str, object]]:
-    if result.equity_curve.empty:
+    if result.equity_detail.empty:
         return []
-    returns = result.equity_curve.pct_change().fillna(0.0) * 100.0
     rows: list[dict[str, object]] = []
-    for timestamp, equity in result.equity_curve.items():
+    for row in result.equity_detail.itertuples(index=False):
         rows.append(
             {
                 "asset": asset,
                 "asset_class": asset_class,
                 "strategy": strategy,
                 "split": split,
-                "timestamp": timestamp.isoformat(),
-                "equity": round(float(equity), 6),
-                "return_pct": round(float(returns.loc[timestamp]), 6),
+                "timestamp": row.timestamp,
+                "gross_equity": round(float(row.gross_equity), 6),
+                "net_equity": round(float(row.net_equity), 6),
+                "gross_return_pct": round(float(row.gross_return_pct), 6),
+                "net_return_pct": round(float(row.net_return_pct), 6),
+                "turnover": round(float(row.turnover), 6),
+                "transaction_cost": round(float(row.transaction_cost), 6),
+                "cumulative_transaction_cost": round(float(row.cumulative_transaction_cost), 6),
             }
         )
     return rows
@@ -158,8 +190,14 @@ def _trade_rows(
                 "entry_price": round(float(trade.entry_price), 6),
                 "exit_price": round(float(trade.exit_price), 6),
                 "leverage": round(float(trade.leverage), 6),
-                "pnl": round(float(trade.pnl), 6),
-                "return_pct": round(float(trade.return_pct), 6),
+                "gross_pnl": round(float(trade.gross_pnl), 6),
+                "net_pnl": round(float(trade.net_pnl), 6),
+                "gross_return_pct": round(float(trade.gross_return_pct), 6),
+                "net_return_pct": round(float(trade.net_return_pct), 6),
+                "transaction_cost": round(float(trade.transaction_cost), 6),
+                "turnover": round(float(trade.turnover), 6),
+                "cumulative_transaction_cost": round(float(trade.cumulative_transaction_cost), 6),
+                "cost_bps": round(float(result.cost_bps), 6),
             }
         )
     return rows
@@ -191,6 +229,7 @@ def run_fixed_15m_experiments(
     assets: set[str] | None = None,
     max_assets_per_class: int | None = None,
     materialize: bool = True,
+    cost_config: TransactionCostConfig = DEFAULT_COST_CONFIG,
 ) -> dict[str, Path]:
     """Run the fixed-parameter 15-minute cross-asset baseline suite."""
     if materialize:
@@ -200,7 +239,7 @@ def run_fixed_15m_experiments(
     tables_dir = output_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
 
-    engine = BacktestEngine(initial_capital=100_000.0, commission_per_share=0.005)
+    engine = BacktestEngine(initial_capital=100_000.0, cost_config=cost_config)
     summary_rows: list[dict[str, object]] = []
     split_summary_rows: list[dict[str, object]] = []
     returns_rows: list[dict[str, object]] = []
@@ -216,7 +255,13 @@ def run_fixed_15m_experiments(
         full_daily_data = _build_daily_data(full_minute_data)
 
         for spec in STRATEGY_SPECS:
-            full_result = engine.run(spec.factory(**spec.params), full_daily_data, full_minute_data)
+            full_result = engine.run(
+                spec.factory(**spec.params),
+                full_daily_data,
+                full_minute_data,
+                asset_class=asset_class,
+                frequency="15min",
+            )
             summary_rows.append(
                 _result_summary_row(
                     full_result,
@@ -252,7 +297,13 @@ def run_fixed_15m_experiments(
             ]:
                 minute_data = _to_market_frame(split_frame)
                 daily_data = _build_daily_data(minute_data)
-                result = engine.run(spec.factory(**spec.params), daily_data, minute_data)
+                result = engine.run(
+                    spec.factory(**spec.params),
+                    daily_data,
+                    minute_data,
+                    asset_class=asset_class,
+                    frequency="15min",
+                )
                 split_summary_rows.append(
                     _result_summary_row(
                         result,
@@ -333,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip preprocessing materialization if the processed contract already exists.",
     )
+    add_cost_args(parser)
     args = parser.parse_args(argv)
 
     paths = run_fixed_15m_experiments(
@@ -340,6 +392,7 @@ def main(argv: list[str] | None = None) -> int:
         assets=_parse_asset_list(args.assets),
         max_assets_per_class=args.max_assets_per_class,
         materialize=not args.skip_materialize,
+        cost_config=cost_config_from_args(args),
     )
     for name, path in sorted(paths.items()):
         print(f"{name}: {path}")

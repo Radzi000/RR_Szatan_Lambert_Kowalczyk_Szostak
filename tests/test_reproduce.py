@@ -31,9 +31,14 @@ def test_reproduction_pipeline_generates_stable_outputs(tmp_path: Path) -> None:
     expected_paths = [
         tmp_path / "tables" / "strategy_summary.csv",
         tmp_path / "tables" / "strategy_summary.md",
+        tmp_path / "tables" / "equity_curves_taken_strats.csv",
+        tmp_path / "tables" / "drawdowns_taken_strats.csv",
+        tmp_path / "tables" / "verification_metrics_taken_strats.csv",
         tmp_path / "tables" / "reproducibility_manifest.json",
         tmp_path / "figures" / "equity_curves.png",
         tmp_path / "figures" / "drawdowns.png",
+        tmp_path / "figures" / "equity_curves_taken_strats.png",
+        tmp_path / "figures" / "drawdowns_taken_strats.png",
         tmp_path / "report" / "final_report.md",
     ]
     for path in expected_paths:
@@ -52,3 +57,4 @@ def test_reproduction_pipeline_generates_stable_outputs(tmp_path: Path) -> None:
     manifest = json.loads((tmp_path / "tables" / "reproducibility_manifest.json").read_text())
     assert manifest["run_command"] == "python -m strategy_development.local_implementation.reproduce"
     assert manifest["environment"]["internet_required_at_runtime"] is False
+    assert manifest["transaction_costs_bps"]["equity_cost_bps"] == 1.0

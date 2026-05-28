@@ -62,8 +62,33 @@ def test_fixed_15m_runner_smoke_outputs(tmp_path: Path) -> None:
     assert set(summary["asset"]) == {"AAPL", "GLD", "BTCUSDT"}
     assert len(summary["strategy"].unique()) == 5
     assert set(split_summary["split"]) == {"train", "validation", "test"}
-    assert {"asset", "asset_class", "strategy", "split", "timestamp", "equity", "return_pct"} == set(returns.columns)
-    assert {"asset", "asset_class", "strategy", "split", "trade_id"} <= set(trades.columns)
+    assert {
+        "asset",
+        "asset_class",
+        "strategy",
+        "split",
+        "timestamp",
+        "gross_equity",
+        "net_equity",
+        "gross_return_pct",
+        "net_return_pct",
+        "turnover",
+        "transaction_cost",
+        "cumulative_transaction_cost",
+    } == set(returns.columns)
+    assert {
+        "asset",
+        "asset_class",
+        "strategy",
+        "split",
+        "trade_id",
+        "gross_pnl",
+        "net_pnl",
+        "transaction_cost",
+        "turnover",
+        "cost_bps",
+    } <= set(trades.columns)
+    assert {"cost_bps", "total_transaction_cost", "total_turnover", "net_sharpe"} <= set(summary.columns)
 
 
 def test_local_implementation_has_no_quantconnect_imports() -> None:

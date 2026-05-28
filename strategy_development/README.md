@@ -61,5 +61,7 @@ Rules:
 - optimization uses train only
 - validation is used only for verification and parameter selection
 - test/OOS remains reserved for a later final evaluation stage
+- optimization and baseline verification are net of centralized transaction
+  costs
 
 Aggregate outputs are written under `outputs/tables/` and `outputs/figures/`.
