@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Iterable
 
 import pandas as pd
 from IPython.display import Markdown, display
@@ -69,23 +70,132 @@ def doc_rel(path: Path) -> str:
     return root_relative if Path.cwd().name == "reports" else "../" + root_relative
 
 
-def read_csv(path: Path, **kwargs) -> pd.DataFrame:
-    if not path.exists():
-        raise FileNotFoundError(f"Required report input is missing: {rel(path)}")
-    return pd.read_csv(path, **kwargs)
+def asset_from_path(value: object) -> str:
+    """Return a compact asset label from a path, source string, or file name."""
+    if pd.isna(value):
+        return ""
+    text = str(value).replace("\\", "/").strip()
+    if not text:
+        return ""
+    stem = Path(text).stem
+    upper = stem.upper()
+    if upper in {"SPY_5M", "SPY_DAILY"}:
+        return "SPY"
+    if upper.endswith("_15M"):
+        stem = stem[:-4]
+    if upper.endswith("_15MIN"):
+        stem = stem[:-6]
+    if "_15MINS_" in upper:
+        stem = stem.split("_15mins_", 1)[0] if "_15mins_" in stem else stem.split("_15MINS_", 1)[0]
+    for prefix in ("COMMODITIES_", "EQUITIES_", "CRYPTO_"):
+        if stem.upper().startswith(prefix):
+            stem = stem[len(prefix):]
+    return stem.upper()
+
+
+def asset_class_from_path(path: Path) -> str:
+    parts = [part.lower() for part in path.parts]
+    if "commodities" in parts:
+        return "commodities"
+    if "equities" in parts:
+        return "equities"
+    if "crypto" in parts:
+        return "crypto"
+    if "1day" in parts or "5min" in parts:
+        return "equity_etf"
+    return "unknown"
+
+
+def frequency_from_path(path: Path) -> str:
+    parts = [part.lower() for part in path.parts]
+    for freq in ("1day", "5min", "15min"):
+        if freq in parts:
+            return freq
+    name = path.name.lower()
+    if "15min" in name or "15m" in name:
+        return "15min"
+    if "5m" in name:
+        return "5min"
+    if "daily" in name:
+        return "1day"
+    return "unknown"
+
+
+def clean_asset_labels(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    path_like = [
+        col for col in out.columns
+        if col.lower() in {"dataset", "source", "path", "file", "filepath", "filename"}
+    ]
+    if "asset" not in out.columns:
+        for col in path_like:
+            out.insert(0, "asset", out[col].map(asset_from_path))
+            break
+    for col in path_like:
+        if col.lower() in {"dataset", "source", "path", "filepath", "filename"}:
+            out = out.drop(columns=[col])
+    return out
+
+
+def safe_read_csv(path: Path, required: bool = False, **kwargs) -> pd.DataFrame:
+    if path.exists():
+        return pd.read_csv(path, **kwargs)
+    message = f"Report input not found: `{rel(path)}`."
+    if required:
+        raise FileNotFoundError(message)
+    display(Markdown(f"> **Missing optional table.** {message} Regenerate outputs with `make reproduce-report`."))
+    return pd.DataFrame()
+
+
+def safe_image(path: Path, caption: str) -> None:
+    if path.exists():
+        display(Markdown(f"![{caption}]({doc_rel(path)}){{fig-alt='{caption}'}}"))
+    else:
+        display(Markdown(
+            f"> **Missing chart.** `{rel(path)}` was not generated. "
+            "Regenerate outputs with `make reproduce-report`."
+        ))
+
+
+def round_visible(df: pd.DataFrame, digits: int = 4) -> pd.DataFrame:
+    out = df.copy()
+    for col in out.columns:
+        if pd.api.types.is_numeric_dtype(out[col]):
+            out[col] = out[col].round(digits)
+    return out
+
+
+def format_metric_table(
+    df: pd.DataFrame,
+    preferred: Iterable[str] | None = None,
+    sort_by: str | None = None,
+    ascending: bool = False,
+    max_rows: int = 12,
+) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = clean_asset_labels(df)
+    if sort_by and sort_by in out.columns:
+        out = out.sort_values(sort_by, ascending=ascending)
+    if preferred:
+        columns = [col for col in preferred if col in out.columns]
+    else:
+        columns = list(out.columns)
+    if not columns:
+        columns = list(out.columns[: min(8, len(out.columns))])
+    return round_visible(out[columns].head(max_rows))
 
 
 def md_table(df: pd.DataFrame, max_rows: int = 12) -> None:
     if df.empty:
         display(Markdown("_No rows available._"))
         return
-    shown = df.head(max_rows).copy()
-    shown = shown.where(pd.notna(shown), "")
+    shown = round_visible(df.head(max_rows)).where(pd.notna(df.head(max_rows)), "")
     columns = [str(col) for col in shown.columns]
 
     def fmt(value: object) -> str:
         if isinstance(value, float):
-            text = f"{value:.6g}"
+            text = f"{value:.4g}"
         else:
             text = str(value)
         return text.replace("|", "\\|").replace("\n", " ")
@@ -99,18 +209,74 @@ def md_table(df: pd.DataFrame, max_rows: int = 12) -> None:
     display(Markdown("\n".join([header, separator, *body])))
 
 
-def include_figure(path: Path, caption: str) -> None:
-    if path.exists():
-        display(Markdown(f"![{caption}]({doc_rel(path)}){{fig-alt='{caption}'}}"))
-    else:
-        display(Markdown(f"_Figure not generated: `{rel(path)}`._"))
+def first_existing(df: pd.DataFrame, candidates: Iterable[str]) -> str | None:
+    return next((col for col in candidates if col in df.columns), None)
 
 
-def compact_frame(df: pd.DataFrame, preferred: list[str], max_rows: int = 12) -> pd.DataFrame:
-    columns = [col for col in preferred if col in df.columns]
-    if not columns:
-        columns = list(df.columns[: min(8, len(df.columns))])
-    return df[columns].head(max_rows)
+def metric_row(df: pd.DataFrame, metric_candidates: Iterable[str], best: bool = True) -> pd.Series | None:
+    metric = first_existing(df, metric_candidates)
+    if metric is None or df.empty:
+        return None
+    ranked = df.dropna(subset=[metric]).sort_values(metric, ascending=not best)
+    return None if ranked.empty else ranked.iloc[0]
+
+
+def split_filter(df: pd.DataFrame, split: str) -> pd.DataFrame:
+    if "split" not in df.columns:
+        return df.copy()
+    return df[df["split"].astype(str).str.lower().eq(split)].copy()
+
+
+def row_label(row: pd.Series | None) -> str:
+    if row is None:
+        return "unavailable"
+    pieces = []
+    for col in ["strategy", "asset", "asset_class", "optimizer"]:
+        if col in row.index and pd.notna(row[col]):
+            pieces.append(str(row[col]))
+    return " / ".join(pieces) if pieces else "unavailable"
+
+
+def metric_value(row: pd.Series | None, candidates: Iterable[str]) -> str:
+    if row is None:
+        return "metric unavailable"
+    col = first_existing(row.to_frame().T, candidates)
+    if col is None or pd.isna(row[col]):
+        return "metric unavailable"
+    value = row[col]
+    return f"{value:.4f}" if isinstance(value, float) else str(value)
+
+
+def add_train_validation_gap(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    train_col = first_existing(out, ["train_net_sharpe", "train_sharpe", "train_objective"])
+    val_col = first_existing(out, ["validation_net_sharpe", "validation_sharpe", "val_net_sharpe"])
+    if train_col and val_col:
+        out["train_validation_gap"] = out[train_col] - out[val_col]
+    return out
+
+
+def summarize_cost_impact(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    gross = first_existing(out, ["gross_total_return", "total_return", "gross_return"])
+    net = first_existing(out, ["net_total_return", "net_return"])
+    if gross and net:
+        out["gross_minus_net_return"] = out[gross] - out[net]
+    return out
+
+
+strategy_summary = safe_read_csv(TABLES / "strategy_summary.csv", required=True)
+fixed_summary = safe_read_csv(TABLES / "fixed_15m_strategy_summary.csv", required=True)
+split_summary = safe_read_csv(TABLES / "fixed_15m_train_validation_test_summary.csv", required=True)
+taken_metrics = safe_read_csv(TABLES / "verification_metrics_taken_strats.csv", required=True)
+our_metrics = safe_read_csv(TABLES / "verification_metrics_our_strats.csv", required=True)
+verification = safe_read_csv(TABLES / "optimization_verification_metrics.csv", required=True)
+comparison = add_train_validation_gap(safe_read_csv(TABLES / "train_validation_comparison.csv", required=True))
+selected = safe_read_csv(TABLES / "selected_params.csv", required=True)
+search = safe_read_csv(TABLES / "optimization_search_results.csv", required=True)
+manifest = json.loads((TABLES / "reproducibility_manifest.json").read_text(encoding="utf-8"))
 ```
 
 ## Executive Summary
@@ -125,13 +291,77 @@ and Docker.
 The pipeline is:
 
 ```text
-data -> preprocessing -> strategy_development -> trade_dependency -> final_portfolio -> outputs
+data -> preprocessing -> strategy_development -> optimization/training -> final_portfolio -> outputs
 ```
 
 The report reads generated CSV outputs from `outputs/tables/` and embeds PNG
 figures from `outputs/figures/`. It does not fabricate missing metrics. If a
 required output is absent, rendering stops with a message explaining how to
 regenerate the inputs.
+
+## Computed Summary
+
+The summary below is computed from the generated CSV outputs. Validation metrics
+are preferred for strategy selection because the project reserves test/OOS data
+for final evaluation rather than tuning or model claims.
+
+```{python}
+#| label: computed-summary
+taken_val = split_filter(taken_metrics, "validation")
+our_val = split_filter(our_metrics, "validation")
+ver_val = split_filter(verification, "validation")
+metric_candidates = ["net_sharpe", "validation_net_sharpe", "sharpe", "net_annualized_sharpe"]
+
+best_taken = metric_row(taken_val if not taken_val.empty else taken_metrics, metric_candidates, best=True)
+worst_taken = metric_row(taken_val if not taken_val.empty else taken_metrics, metric_candidates, best=False)
+best_optimized = metric_row(our_val if not our_val.empty else ver_val, metric_candidates, best=True)
+worst_optimized = metric_row(our_val if not our_val.empty else ver_val, metric_candidates, best=False)
+
+summary_rows = [
+    {"item": "Best taken strategy", "selection": row_label(best_taken), "metric": metric_value(best_taken, metric_candidates)},
+    {"item": "Worst taken strategy", "selection": row_label(worst_taken), "metric": metric_value(worst_taken, metric_candidates)},
+    {"item": "Best optimized strategy", "selection": row_label(best_optimized), "metric": metric_value(best_optimized, metric_candidates)},
+    {"item": "Worst optimized strategy", "selection": row_label(worst_optimized), "metric": metric_value(worst_optimized, metric_candidates)},
+]
+md_table(pd.DataFrame(summary_rows), max_rows=10)
+```
+
+```{python}
+#| label: summary-bullets
+bullets = []
+val_col = first_existing(comparison, ["validation_net_sharpe", "validation_sharpe", "val_net_sharpe"])
+train_col = first_existing(comparison, ["train_net_sharpe", "train_sharpe", "train_objective"])
+gap_col = "train_validation_gap" if "train_validation_gap" in comparison.columns else None
+if train_col and val_col:
+    train_mean = comparison[train_col].mean()
+    val_mean = comparison[val_col].mean()
+    bullets.append(f"Average train Sharpe proxy is {train_mean:.3f}; average validation Sharpe proxy is {val_mean:.3f}.")
+    if gap_col:
+        gap = comparison[gap_col].mean()
+        bullets.append(f"The average train-validation Sharpe gap is {gap:.3f}; larger positive gaps are treated as overfit risk.")
+if not fixed_summary.empty and "asset_class" in fixed_summary.columns:
+    sharpe_col = first_existing(fixed_summary, ["net_sharpe", "sharpe"])
+    if sharpe_col:
+        grouped = fixed_summary.groupby("asset_class", dropna=False)[sharpe_col].mean().sort_values(ascending=False)
+        if not grouped.empty:
+            bullets.append(f"Best average fixed-baseline asset class by {sharpe_col}: {grouped.index[0]} ({grouped.iloc[0]:.3f}).")
+            bullets.append(f"Worst average fixed-baseline asset class by {sharpe_col}: {grouped.index[-1]} ({grouped.iloc[-1]:.3f}).")
+cost_cols = [col for col in list(verification.columns) + list(fixed_summary.columns) if "cost" in col.lower()]
+if cost_cols:
+    bullets.append("Transaction costs are present in generated metrics and are included in the optimization objective and validation results.")
+drawdown_col = first_existing(our_val if not our_val.empty else verification, ["max_drawdown", "validation_max_drawdown"])
+if drawdown_col:
+    worst_dd = (our_val if not our_val.empty else verification)[drawdown_col].min()
+    bullets.append(f"Optimized validation drawdown risk reaches {worst_dd:.3f} on the available drawdown metric.")
+if best_taken is not None and best_optimized is not None:
+    taken_metric = first_existing(best_taken.to_frame().T, metric_candidates)
+    opt_metric = first_existing(best_optimized.to_frame().T, metric_candidates)
+    if taken_metric and opt_metric and pd.notna(best_taken[taken_metric]) and pd.notna(best_optimized[opt_metric]):
+        diff = float(best_optimized[opt_metric]) - float(best_taken[taken_metric])
+        direction = "improved" if diff > 0 else "did not improve"
+        bullets.append(f"Best optimized validation Sharpe proxy {direction} versus the best taken strategy by {diff:.3f}.")
+display(Markdown("\n".join(f"- {item}" for item in bullets) if bullets else "_Summary metrics are unavailable._"))
+```
 
 ## Reproducible Pipeline
 
@@ -159,9 +389,9 @@ The convenience target is:
 make reproduce-report
 ```
 
-The report target uses the deterministic smoke optimization mode so that report
-generation remains practical. The full research-scale optimization command is
-available separately as
+The report target uses deterministic practical optimization settings so that
+report generation remains feasible. The full research-scale optimization
+command is available separately as
 `python -m strategy_development.local_implementation.optimization.run_all_optimizations`.
 
 ## Data
@@ -174,6 +404,8 @@ The shared OHLCV schema is:
 timestamp, open, high, low, close, volume
 ```
 
+### Inventory
+
 ```{python}
 #| label: data-inventory
 rows = []
@@ -183,31 +415,37 @@ for path in sorted(DATA.glob("**/*.csv")):
     try:
         frame = pd.read_csv(path)
     except Exception as exc:
-        rows.append({"dataset": rel(path), "rows": None, "columns": f"read error: {exc}", "start": "", "end": "", "missing_values": ""})
+        rows.append({
+            "asset": asset_from_path(path),
+            "asset_class": asset_class_from_path(path),
+            "frequency": frequency_from_path(path),
+            "rows": "",
+            "start": "",
+            "end": "",
+            "missing_values": f"read error: {exc}",
+        })
         continue
     timestamp_col = "timestamp" if "timestamp" in frame.columns else frame.columns[0]
     parsed = pd.to_datetime(frame[timestamp_col], errors="coerce")
-    asset_class = path.parent.name
-    frequency = path.parent.parent.name if path.parent.parent.name in {"1day", "5min", "15min"} else path.parent.name
     rows.append(
         {
-            "dataset": rel(path),
-            "asset_class": asset_class,
-            "frequency": frequency,
+            "asset": asset_from_path(path),
+            "asset_class": asset_class_from_path(path),
+            "frequency": frequency_from_path(path),
             "rows": len(frame),
             "start": parsed.min(),
             "end": parsed.max(),
             "missing_values": int(frame.isna().sum().sum()),
         }
     )
-data_inventory = pd.DataFrame(rows)
-md_table(data_inventory, max_rows=30)
+data_inventory = pd.DataFrame(rows).sort_values(["asset_class", "frequency", "asset"])
+md_table(data_inventory, max_rows=40)
 ```
 
 ### Descriptive Statistics
 
-The table below is generated from committed raw OHLCV files. It summarizes the
-numeric columns actually present in the repository.
+The table below is generated from committed raw OHLCV files. It summarizes
+numeric columns present in the repository and uses compact asset labels.
 
 ```{python}
 #| label: describe-summary
@@ -220,10 +458,11 @@ for path in sorted(DATA.glob("**/*.csv")):
     if numeric.empty:
         continue
     desc = numeric.describe().T.reset_index().rename(columns={"index": "column"})
-    desc.insert(0, "dataset", rel(path))
+    desc.insert(0, "asset_class", asset_class_from_path(path))
+    desc.insert(0, "asset", asset_from_path(path))
     frames.append(desc)
 describe_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-md_table(describe_df[["dataset", "column", "count", "mean", "std", "min", "max"]], max_rows=20)
+md_table(describe_df[["asset", "asset_class", "column", "count", "mean", "std", "min", "max"]], max_rows=40)
 ```
 
 ### Processed Data And Splits
@@ -235,11 +474,15 @@ CSV files, and split CSV files.
 ```{python}
 #| label: processed-summary
 processed_files = sorted(PROCESSED.glob("**/*"))
-processed_rows = [
-    {"path": rel(path), "bytes": path.stat().st_size}
-    for path in processed_files
-    if path.is_file()
-]
+processed_rows = []
+for path in processed_files:
+    if not path.is_file():
+        continue
+    processed_rows.append({
+        "asset": asset_from_path(path),
+        "artifact_type": path.parent.name,
+        "bytes": path.stat().st_size,
+    })
 md_table(pd.DataFrame(processed_rows), max_rows=25)
 ```
 
@@ -261,7 +504,6 @@ metadata for the canonical output stage.
 
 ```{python}
 #| label: manifest
-manifest = json.loads((TABLES / "reproducibility_manifest.json").read_text(encoding="utf-8"))
 display(Markdown("```json\n" + json.dumps(manifest, indent=2) + "\n```"))
 ```
 
@@ -280,22 +522,80 @@ reported metrics. The default per-side assumptions are:
 Unless a table explicitly includes gross columns, the reported baseline,
 optimization, and portfolio metrics are net of transaction costs.
 
-## Taken Strategies
+## Strategies' Logic
 
-The taken strategies are downloaded QuantConnect-style intraday momentum
-strategies preserved under `strategy_development/taken_strategies/` as
-reference-only originals. They provide the source logic and intuition:
+All five variants are intraday momentum/breakout strategies. They look for
+short-horizon price movement during the trading session, open positions when
+the local momentum rule is satisfied, and exit according to intraday timing or
+confirmation logic. The downloaded QuantConnect files are preserved as
+reference-only source material; the local Python implementation under
+`strategy_development/local_implementation/` is authoritative for results,
+tests, Docker, and this report.
 
-- a baseline intraday momentum rule,
-- asymmetric entry and exit timing,
-- an EMA trend filter,
-- exit confirmation logic,
-- and a combined EMA plus confirmation variant.
+The local implementation adapts the original QuantConnect-style logic to a
+deterministic 15-minute cross-asset research setting. Costs are applied inside
+backtests and inside Workstream C optimization, so selected parameters are
+chosen on net rather than gross performance.
 
-QuantConnect itself is not required to run the project. The strategies were
-rewritten locally under `strategy_development/local_implementation/`, which is
-the authoritative implementation for reproduction, testing, Docker, and this
-report.
+```{python}
+#| label: strategy-logic-table
+logic_rows = [
+    {
+        "Strategy": "Strategy0 / Baseline",
+        "Core idea": "Intraday momentum breakout",
+        "Entry rule": "Enter after a qualifying intraday move from the reference interval",
+        "Exit rule": "Exit on the fixed intraday exit schedule",
+        "Added filter/confirmation": "None",
+        "Optimizer used in Workstream C": "NES",
+        "Notes": "Reference baseline rewritten locally and adapted to 15-minute bars",
+    },
+    {
+        "Strategy": "Strategy1 / Asymmetric Intervals",
+        "Core idea": "Separate entry and exit timing",
+        "Entry rule": "Use an optimized entry interval for momentum detection",
+        "Exit rule": "Use a separately optimized exit interval",
+        "Added filter/confirmation": "Asymmetric timing",
+        "Optimizer used in Workstream C": "NES",
+        "Notes": "Tests whether entry and exit clocks should differ",
+    },
+    {
+        "Strategy": "Strategy2 / EMA Filter",
+        "Core idea": "Trade momentum only with trend confirmation",
+        "Entry rule": "Enter when breakout condition agrees with EMA trend state",
+        "Exit rule": "Exit on the intraday schedule",
+        "Added filter/confirmation": "EMA trend filter",
+        "Optimizer used in Workstream C": "NES",
+        "Notes": "Aims to reduce trades against the prevailing trend",
+    },
+    {
+        "Strategy": "Strategy3 / Exit Confirmation",
+        "Core idea": "Avoid exiting on weak/noisy reversal signals",
+        "Entry rule": "Baseline-style momentum entry",
+        "Exit rule": "Exit only after confirmation criteria are satisfied",
+        "Added filter/confirmation": "Exit confirmation",
+        "Optimizer used in Workstream C": "CMA-ES",
+        "Notes": "Tests whether confirmation improves holding discipline",
+    },
+    {
+        "Strategy": "Strategy4 / EMA + Confirmation",
+        "Core idea": "Combine trend filtering and confirmed exits",
+        "Entry rule": "Momentum entry gated by EMA state",
+        "Exit rule": "Confirmation-aware intraday exit",
+        "Added filter/confirmation": "EMA filter plus exit confirmation",
+        "Optimizer used in Workstream C": "CMA-ES",
+        "Notes": "Most restrictive variant; trades off selectivity against opportunity count",
+    },
+]
+md_table(pd.DataFrame(logic_rows), max_rows=10)
+```
+
+The economic intuition is simple: if an intraday instrument breaks away from
+its recent reference price, short-lived continuation may be exploitable before
+the session closes. Strategy1 asks whether entry and exit horizons should be
+different. Strategy2 adds trend context through an EMA. Strategy3 delays exits
+until an additional confirmation rule is met. Strategy4 combines the EMA filter
+and exit confirmation, increasing selectivity but also raising the risk of
+missing otherwise profitable moves.
 
 ## Performance Of Taken Strategies
 
@@ -306,32 +606,38 @@ and test summaries.
 
 ```{python}
 #| label: canonical-summary
-strategy_summary = read_csv(TABLES / "strategy_summary.csv")
-md_table(strategy_summary)
+md_table(format_metric_table(strategy_summary, max_rows=10))
 ```
+
+### Taken Strategy Ranking
 
 ```{python}
 #| label: fixed-summary
-fixed_summary = read_csv(TABLES / "fixed_15m_strategy_summary.csv")
-md_table(compact_frame(
-    fixed_summary,
-    ["strategy", "asset", "asset_class", "split", "net_total_return", "net_sharpe", "max_drawdown", "total_transaction_cost"],
+fixed_rank = summarize_cost_impact(fixed_summary)
+md_table(format_metric_table(
+    fixed_rank,
+    ["strategy", "asset", "asset_class", "split", "net_total_return", "net_sharpe", "max_drawdown", "total_transaction_cost", "gross_minus_net_return"],
+    sort_by=first_existing(fixed_rank, ["net_sharpe", "sharpe"]),
     max_rows=15,
 ))
 ```
 
 ```{python}
 #| label: taken-verification
-taken_metrics = read_csv(TABLES / "verification_metrics_taken_strats.csv")
-md_table(taken_metrics)
+md_table(format_metric_table(
+    taken_metrics,
+    ["strategy", "asset", "asset_class", "split", "net_total_return", "net_sharpe", "max_drawdown", "total_transaction_cost", "trades"],
+    sort_by=first_existing(taken_metrics, ["net_sharpe", "sharpe"]),
+    max_rows=15,
+))
 ```
 
 ```{python}
 #| label: taken-figures
-include_figure(FIGURES / "equity_curves_taken_strats.png", "Taken strategy equity curves")
-include_figure(FIGURES / "drawdowns_taken_strats.png", "Taken strategy drawdowns")
-include_figure(FIGURES / "equity_curves.png", "Canonical SPY equity curves")
-include_figure(FIGURES / "drawdowns.png", "Canonical SPY drawdowns")
+safe_image(FIGURES / "equity_curves_taken_strats.png", "Taken strategy equity curves")
+safe_image(FIGURES / "drawdowns_taken_strats.png", "Taken strategy drawdowns")
+safe_image(FIGURES / "equity_curves.png", "Canonical SPY equity curves")
+safe_image(FIGURES / "drawdowns.png", "Canonical SPY drawdowns")
 ```
 
 ## Optimized Strategies
@@ -351,73 +657,206 @@ The objective is cost-adjusted train net Sharpe. Parameter spaces are defined in
 aggregate runner records selected parameters and verification metrics in
 machine-readable CSV outputs.
 
+### Parameter Summary
+
 ```{python}
 #| label: selected-params
-selected = read_csv(TABLES / "selected_params.csv")
-md_table(compact_frame(
+md_table(format_metric_table(
     selected,
     ["strategy", "asset", "asset_class", "optimizer", "objective", "validation_net_sharpe", "params"],
+    sort_by=first_existing(selected, ["validation_net_sharpe", "objective"]),
     max_rows=15,
 ))
 ```
+
+### Optimization Search
 
 ```{python}
 #| label: optimization-search
-search = read_csv(TABLES / "optimization_search_results.csv")
-summary_cols = [col for col in ["strategy", "asset", "asset_class", "optimizer", "iteration", "candidate", "train_net_sharpe", "objective"] if col in search.columns]
-md_table(search[summary_cols].head(15) if summary_cols else search.head(15))
+summary_cols = [
+    col for col in [
+        "strategy", "asset", "asset_class", "optimizer", "iteration", "candidate",
+        "train_net_sharpe", "objective", "net_sharpe"
+    ]
+    if col in search.columns
+]
+md_table(format_metric_table(search, summary_cols, max_rows=15))
 ```
+
+### Train-Validation Comparison
 
 ```{python}
 #| label: train-validation-comparison
-comparison = read_csv(TABLES / "train_validation_comparison.csv")
-md_table(compact_frame(
+md_table(format_metric_table(
     comparison,
-    ["strategy", "asset", "asset_class", "train_net_sharpe", "validation_net_sharpe", "selected"],
+    ["strategy", "asset", "asset_class", "train_net_sharpe", "validation_net_sharpe", "train_validation_gap", "selected"],
+    sort_by=first_existing(comparison, ["validation_net_sharpe", "validation_sharpe"]),
     max_rows=15,
 ))
 ```
+
+```{python}
+#| label: overfit-warning
+gap_col = "train_validation_gap" if "train_validation_gap" in comparison.columns else None
+if gap_col:
+    high_gap = comparison.sort_values(gap_col, ascending=False).head(10)
+    display(Markdown("The largest positive train-validation gaps are treated as overfit warnings, not final OOS failures."))
+    md_table(format_metric_table(
+        high_gap,
+        ["strategy", "asset", "asset_class", "train_net_sharpe", "validation_net_sharpe", "train_validation_gap"],
+        max_rows=10,
+    ))
+```
+
+### Optimized Strategy Ranking
 
 ```{python}
 #| label: optimized-verification
-our_metrics = read_csv(TABLES / "verification_metrics_our_strats.csv")
-verification = read_csv(TABLES / "optimization_verification_metrics.csv")
-md_table(compact_frame(
+md_table(format_metric_table(
     verification,
-    ["strategy", "asset", "asset_class", "split", "net_total_return", "net_sharpe", "max_drawdown", "total_transaction_cost"],
+    ["strategy", "asset", "asset_class", "split", "net_total_return", "net_sharpe", "max_drawdown", "total_transaction_cost", "turnover", "trades"],
+    sort_by=first_existing(verification, ["net_sharpe", "sharpe"]),
     max_rows=15,
 ))
 ```
 
+### Baseline Vs Optimized Comparison
+
+```{python}
+#| label: baseline-vs-optimized
+taken_for_compare = split_filter(taken_metrics, "validation")
+opt_for_compare = split_filter(our_metrics, "validation")
+compare_metric = first_existing(taken_for_compare, ["net_sharpe", "sharpe"]) or first_existing(opt_for_compare, ["net_sharpe", "sharpe"])
+if compare_metric and not taken_for_compare.empty and not opt_for_compare.empty:
+    taken_group = taken_for_compare.groupby("strategy", dropna=False)[compare_metric].mean().rename("taken_validation_metric")
+    opt_group = opt_for_compare.groupby("strategy", dropna=False)[compare_metric].mean().rename("optimized_validation_metric")
+    baseline_compare = pd.concat([taken_group, opt_group], axis=1).reset_index()
+    baseline_compare["optimized_minus_taken"] = baseline_compare["optimized_validation_metric"] - baseline_compare["taken_validation_metric"]
+    md_table(format_metric_table(baseline_compare, sort_by="optimized_minus_taken", max_rows=10))
+else:
+    display(Markdown("_Baseline-versus-optimized validation comparison is unavailable because compatible metrics are missing._"))
+```
+
+### Asset-Class Aggregation
+
+```{python}
+#| label: asset-class-aggregation
+if "asset_class" in verification.columns:
+    sharpe_col = first_existing(verification, ["net_sharpe", "sharpe"])
+    dd_col = first_existing(verification, ["max_drawdown", "drawdown"])
+    agg_map = {}
+    if sharpe_col:
+        agg_map[sharpe_col] = "mean"
+    if dd_col:
+        agg_map[dd_col] = "min"
+    if agg_map:
+        agg = verification.groupby(["split", "asset_class"], dropna=False).agg(agg_map).reset_index()
+        md_table(format_metric_table(agg, sort_by=sharpe_col, max_rows=20))
+    else:
+        display(Markdown("_No compatible asset-class aggregation metrics are available._"))
+else:
+    display(Markdown("_Asset-class aggregation is unavailable because `asset_class` is not present._"))
+```
+
+### Drawdown And Cost Tables
+
+```{python}
+#| label: drawdown-cost-tables
+dd_col = first_existing(verification, ["max_drawdown", "drawdown"])
+if dd_col:
+    display(Markdown("Lowest drawdown observations:"))
+    md_table(format_metric_table(
+        verification,
+        ["strategy", "asset", "asset_class", "split", "net_sharpe", dd_col, "net_total_return"],
+        sort_by=dd_col,
+        ascending=True,
+        max_rows=10,
+    ))
+cost_candidates = [col for col in verification.columns if "cost" in col.lower() or "turnover" in col.lower() or "trade" in col.lower()]
+if cost_candidates:
+    display(Markdown("Turnover, trade-count, and transaction-cost observations where available:"))
+    md_table(format_metric_table(
+        verification,
+        ["strategy", "asset", "asset_class", "split", *cost_candidates],
+        max_rows=10,
+    ))
+```
+
+### Optimization Figures
+
 ```{python}
 #| label: optimization-figures
-include_figure(FIGURES / "optimization_convergence.png", "Optimization convergence")
-include_figure(FIGURES / "train_validation_sharpe_comparison.png", "Train and validation Sharpe comparison")
-include_figure(FIGURES / "equity_curves_our_strats.png", "Optimized strategy equity curves")
-include_figure(FIGURES / "drawdowns_our_strats.png", "Optimized strategy drawdowns")
-include_figure(FIGURES / "equity_curves_our_strats_train.png", "Optimized strategy train equity curves")
-include_figure(FIGURES / "equity_curves_our_strats_validation.png", "Optimized strategy validation equity curves")
+safe_image(FIGURES / "optimization_convergence.png", "Optimization convergence")
+safe_image(FIGURES / "train_validation_sharpe_comparison.png", "Train vs validation Sharpe comparison")
+safe_image(FIGURES / "equity_curves_our_strats_train.png", "Optimized train equity curves")
+safe_image(FIGURES / "equity_curves_our_strats_validation.png", "Optimized validation equity curves")
+safe_image(FIGURES / "drawdowns_our_strats_train.png", "Optimized train drawdowns")
+safe_image(FIGURES / "drawdowns_our_strats_validation.png", "Optimized validation drawdowns")
 ```
+
+## Best Strategy Deep Dive
+
+This section uses validation results, not test/OOS results, because the current
+pipeline uses validation for model/parameter selection and reserves test data
+for final out-of-sample evaluation.
+
+```{python}
+#| label: best-strategy-deep-dive
+best_source = our_val if not our_val.empty else ver_val
+best_metric = first_existing(best_source, ["net_sharpe", "validation_net_sharpe", "sharpe"])
+best_row = metric_row(best_source, [best_metric] if best_metric else [], best=True)
+if best_row is None:
+    display(Markdown("_Best optimized validation strategy cannot be identified from available metrics._"))
+else:
+    key = {col: best_row[col] for col in [
+        "strategy", "optimizer", "asset", "asset_class", "split", "net_sharpe",
+        "validation_net_sharpe", "net_total_return", "max_drawdown",
+        "turnover", "total_transaction_cost", "trades", "trade_count"
+    ] if col in best_row.index}
+    best_table = pd.DataFrame([key])
+    if not selected.empty:
+        selector = pd.Series(True, index=selected.index)
+        for col in ["strategy", "asset", "asset_class"]:
+            if col in selected.columns and col in best_row.index:
+                selector &= selected[col].astype(str).eq(str(best_row[col]))
+        matched = selected[selector].head(1)
+        if not matched.empty:
+            for col in ["optimizer", "params", "objective", "validation_net_sharpe"]:
+                if col in matched.columns and col not in best_table.columns:
+                    best_table[col] = matched.iloc[0][col]
+    md_table(format_metric_table(best_table, max_rows=1))
+```
+
+The generated figures currently provide aggregate validation equity curves and
+drawdowns rather than a separate single-strategy chart for the selected best
+row. The charts below are therefore aggregate validation views; the selected
+strategy should be read from the table above.
+
+```{python}
+#| label: best-strategy-figures
+safe_image(FIGURES / "equity_curves_our_strats_validation.png", "Optimized validation equity curves for best-strategy context")
+safe_image(FIGURES / "drawdowns_our_strats_validation.png", "Optimized validation drawdowns for best-strategy context")
+```
+
+Limitations: validation performance is useful for model selection but is not a
+clean final OOS claim. A large train-validation gap, high drawdown, high
+turnover, or strong sensitivity to transaction costs should be treated as a
+robustness warning.
 
 ## Final Portfolio
 
 The final portfolio layer consumes `outputs/tables/equity_curves_our_strats.csv`
-from Workstream C and compares:
-
-- equal weights,
-- Markowitz maximum-Sharpe allocation,
-- Kelly-style allocation,
-- dependency-adjusted Kelly and Markowitz variants.
-
-Grid-search selection is performed on the train split. The currently generated
-portfolio figures and markdown report describe validation-period evaluation,
-not a test/OOS claim.
+from Workstream C and compares equal-weight, Markowitz, Kelly-style, and
+dependency-aware allocation variants. Grid-search selection is performed on the
+train split. The currently generated portfolio figures and markdown report
+describe validation-period evaluation, not a test/OOS claim.
 
 ```{python}
 #| label: portfolio-status
 portfolio_figures = [
     FIGURES / "final_portfolio_comparison.png",
     FIGURES / "final_portfolio_timeline.png",
+    FIGURES / "final_portfolio_equal_weight.png",
     FIGURES / "final_portfolio_equal_weight_train.png",
     FIGURES / "final_portfolio_grid_search.png",
     FIGURES / "final_portfolio_acf.png",
@@ -427,8 +866,8 @@ portfolio_report = REPORTS / "final_portfolio_report.md"
 missing_portfolio = [path for path in portfolio_figures + [portfolio_report] if not path.exists()]
 if missing_portfolio:
     display(Markdown(
-        "Final portfolio outputs are not fully available. Generate them with "
-        "`python -m final_portfolio.run_report` after Workstream C outputs exist. "
+        "> **Portfolio outputs not generated yet.** Generate them with "
+        "`python -m final_portfolio.run_report` after `outputs/tables/equity_curves_our_strats.csv` exists. "
         "Missing files: " + ", ".join(f"`{rel(path)}`" for path in missing_portfolio)
     ))
 else:
@@ -439,13 +878,14 @@ else:
 #| label: portfolio-figures
 for fig_path, caption in [
     (FIGURES / "final_portfolio_comparison.png", "Final portfolio method comparison"),
-    (FIGURES / "final_portfolio_timeline.png", "Final portfolio timeline"),
+    (FIGURES / "final_portfolio_timeline.png", "Final portfolio validation timeline"),
+    (FIGURES / "final_portfolio_equal_weight.png", "Equal-weight validation portfolio"),
     (FIGURES / "final_portfolio_equal_weight_train.png", "Equal-weight train portfolio"),
     (FIGURES / "final_portfolio_grid_search.png", "Final portfolio grid search"),
-    (FIGURES / "final_portfolio_acf.png", "Trade dependency autocorrelation"),
-    (FIGURES / "final_portfolio_drawdowns_val.png", "Validation drawdown comparison"),
+    (FIGURES / "final_portfolio_acf.png", "Portfolio trade dependency autocorrelation"),
+    (FIGURES / "final_portfolio_drawdowns_val.png", "Final portfolio validation drawdowns"),
 ]:
-    include_figure(fig_path, caption)
+    safe_image(fig_path, caption)
 ```
 
 ```{python}
@@ -475,9 +915,16 @@ docker compose up --build reproduce
 Report generation commands:
 
 ```bash
+pip install -e ".[report]"
+quarto render reports/final_report.qmd
+```
+
+Convenience targets:
+
+```bash
 make reproduce-report
 make report
-quarto render reports/final_report.qmd
+make report-clean
 ```
 
 Expected output locations:
@@ -488,11 +935,23 @@ Expected output locations:
 - rendered Quarto HTML: `reports/final_report.html`
 
 Rendered Quarto outputs are not committed. The source of record is
-`reports/final_report.qmd` plus the deterministic code and generated
+`reports/final_report.qmd` plus deterministic code and generated
 machine-readable outputs.
 
-The CI workflow runs Python dependency installation, `pytest`, Docker Compose
-configuration validation, and the deterministic local reproduction command. It
-avoids full optimization so that pull-request checks stay practical.
+The CI workflow in `.github/workflows/ci.yml` installs Python dependencies,
+runs `pytest`, validates `docker compose config`, and runs the deterministic
+local reproduction command. It avoids full Workstream C optimization so that
+pull-request checks stay practical.
+
+Reproducibility safeguards:
+
+- committed data and deterministic manifests are used as final pipeline inputs;
+- no live downloads are required;
+- QuantConnect, Lean CLI, and cloud APIs are not part of the execution path;
+- no manual notebooks are required;
+- optimization uses train only for fitting and validation only for selection;
+- test/OOS data is not used for tuning claims;
+- transaction costs are centralized and included in reported net metrics;
+- deterministic seeds are used where stochastic optimization is present.
 
 AI assistance is disclosed in `AI_USAGE.md`.
