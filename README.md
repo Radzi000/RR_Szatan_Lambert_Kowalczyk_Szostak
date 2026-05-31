@@ -6,6 +6,10 @@ QuantConnect-style intraday momentum strategies from the upstream project
 [`blackswan-quants/intraday-momentum`](https://github.com/blackswan-quants/intraday-momentum)
 with a fully local, deterministic, Dockerized workflow.
 
+# How to run this
+quarto render reports/final_report.qmd
+start reports\final_report.html
+
 ## Research Question
 
 Do simple intraday momentum rules on SPY remain competitive when extended with:
