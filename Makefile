@@ -1,4 +1,4 @@
-.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report-quarto reproduce docker-build docker-test docker-reproduce clean
+.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report-quarto reproduce final-portfolio docker-build docker-test docker-reproduce clean
 
 PYTHON ?= python
 PIP ?= pip
@@ -51,6 +51,9 @@ report-quarto:  ## Render the optional Quarto Workstream C report if Quarto is i
 
 reproduce:  ## Run the deterministic research pipeline locally
 	$(PYTHON) -m strategy_development.local_implementation.reproduce
+
+final-portfolio:  ## Run final portfolio construction: grid search, figures, and report
+	$(PYTHON) -m final_portfolio.run_report
 
 docker-build:  ## Build the Docker image
 	docker build -t intraday-momentum-repro .
