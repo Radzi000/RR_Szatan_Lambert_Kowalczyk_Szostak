@@ -1,0 +1,22 @@
+project:
+  type: default
+  title: "Intraday Momentum Reproduction And Extension"
+  render:
+    - reports/final_report.qmd
+    - reports/workstream_c_optimization_report.qmd
+
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    fig-responsive: true
+    theme: cosmo
+
+execute:
+  echo: false
+  warning: false
+  message: false
+  error: false

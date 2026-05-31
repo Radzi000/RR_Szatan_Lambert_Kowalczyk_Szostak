@@ -1,4 +1,4 @@
-.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report-quarto reproduce final-portfolio docker-build docker-test docker-reproduce clean
+.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report report-clean report-quarto reproduce reproduce-report final-portfolio docker-build docker-test docker-reproduce clean
 
 PYTHON ?= python
 PIP ?= pip
@@ -49,8 +49,24 @@ results:  ## Generate cost-aware baseline and optimization result artifacts
 report-quarto:  ## Render the optional Quarto Workstream C report if Quarto is installed
 	quarto render reports/workstream_c_optimization_report.qmd
 
+report:  ## Render the final Quarto report if Quarto is installed
+	quarto render reports/final_report.qmd
+
+report-clean:  ## Remove generated Quarto report artifacts only
+	$(PYTHON) -c "from pathlib import Path; import shutil; root = Path('.'); \
+[shutil.rmtree(path, ignore_errors=True) for path in [root / 'reports' / '_site', root / '.quarto']]; \
+[path.unlink() for pattern in ['reports/*.html', 'reports/*.pdf', 'reports/*.docx'] for path in root.glob(pattern) if path.is_file()]; \
+[shutil.rmtree(path, ignore_errors=True) for pattern in ['*_cache', '*_files'] for path in (root / 'reports').glob(pattern) if path.is_dir()]"
+
 reproduce:  ## Run the deterministic research pipeline locally
 	$(PYTHON) -m strategy_development.local_implementation.reproduce
+
+reproduce-report:  ## Regenerate report inputs with practical deterministic commands, then render Quarto
+	$(PYTHON) -m preprocessing.materialize_processed_data
+	$(PYTHON) -m strategy_development.local_implementation.run_fixed_15m_experiments
+	$(PYTHON) -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke
+	$(PYTHON) -m final_portfolio.run_report
+	quarto render reports/final_report.qmd
 
 final-portfolio:  ## Run final portfolio construction: grid search, figures, and report
 	$(PYTHON) -m final_portfolio.run_report

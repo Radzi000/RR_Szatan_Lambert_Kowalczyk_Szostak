@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-and-reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config
+
+      - name: Run deterministic local reproduction
+        run: python -m strategy_development.local_implementation.reproduce
+
+      - name: Build Docker image
+        run: docker compose build reproduce

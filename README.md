@@ -89,6 +89,56 @@ This is the primary grading workflow. It:
 - does not require QuantConnect,
 - requires no notebooks and no local Python installation.
 
+## Final Quarto Report
+
+The final report source is [reports/final_report.qmd](reports/final_report.qmd).
+It is written in English and reads generated CSV outputs from `outputs/tables/`
+and generated PNG figures from `outputs/figures/`. It does not contain copied
+or fabricated result tables.
+
+Rendered Quarto outputs are intentionally not committed. Files such as
+`reports/*.html`, `reports/*.pdf`, `reports/*.docx`, `reports/_site/`,
+`.quarto/`, and Quarto cache directories are generated artifacts and are ignored
+by Git. The committed source is the `.qmd` file plus deterministic code,
+configuration, and documentation.
+
+Prerequisites for local report rendering:
+
+- Python 3.10+ environment with project dependencies
+- report extras: `pip install -e ".[report]"`
+- local Quarto installation from https://quarto.org
+
+Generate the report inputs and render the report:
+
+```bash
+make reproduce-report
+```
+
+Render only, after outputs already exist:
+
+```bash
+make report
+quarto render reports/final_report.qmd
+```
+
+Clean rendered report artifacts:
+
+```bash
+make report-clean
+```
+
+With the current Quarto config, local rendering writes:
+
+- `reports/final_report.html`
+
+The main Docker reproduce command does not render Quarto and does not install
+Quarto. This keeps the canonical Docker path stable and focused on the
+deterministic pipeline:
+
+```bash
+docker compose up --build reproduce
+```
+
 ## Expected Outputs
 
 After a successful run, the repository writes:
@@ -207,6 +257,8 @@ make fixed-15m
 make optimize
 make optimize-smoke
 make results
+make reproduce-report
+make report
 make reproduce
 ```
 
@@ -220,6 +272,11 @@ Main targets:
 - `make optimize` runs the Workstream C train/validation optimization suite
 - `make optimize-smoke` runs a faster smoke-mode Workstream C optimization suite
 - `make results` runs the full cost-aware baseline plus optimization result generation
+- `make report` renders `reports/final_report.qmd` with Quarto
+- `make report-clean` removes rendered Quarto report artifacts only
+- `make reproduce-report` regenerates report inputs with deterministic
+  preprocessing, fixed-baseline, practical smoke optimization, final portfolio,
+  and Quarto render steps
 - `make reproduce` runs `python -m strategy_development.local_implementation.reproduce`
 - `make final-portfolio` runs the final portfolio construction: grid search, figures, and report
 - `make test` runs the offline pytest suite
@@ -348,6 +405,13 @@ docker compose run --rm optimization
 docker run --rm -v ${PWD}/outputs:/app/outputs intraday-momentum-repro
 ```
 
+Quarto rendering is local by default:
+
+```bash
+pip install -e ".[report]"
+make reproduce-report
+```
+
 Remove stale containers, networks, and the local image:
 
 ```bash
@@ -395,9 +459,20 @@ but the Linux daemon is not running yet. Start Docker Desktop and retry until
 - deterministic fixed 15-minute baseline in
   `python -m strategy_development.local_implementation.run_fixed_15m_experiments`
 - Docker environment for grading
+- source-only Quarto report in `reports/final_report.qmd`
+- rendered Quarto files excluded from version control
 - fixed strategy parameters
 - stable output filenames under `outputs/`
 - offline smoke tests
+
+## Continuous Integration
+
+GitHub Actions CI is defined in `.github/workflows/ci.yml` and runs on `push`
+and `pull_request`. The workflow installs the project, runs `pytest`, validates
+`docker compose config`, runs the deterministic local reproduction command, and
+builds the Docker `reproduce` service. CI intentionally avoids full Workstream C
+optimization because the full research-scale search is slower than practical
+pull-request checks.
 
 ## Workstream C Inputs
 

@@ -78,6 +78,16 @@ If Docker is available, keep the Docker command passing too.
 - Tables go under `outputs/tables/`.
 - Figures go under `outputs/figures/`.
 - Reports go under `outputs/report/`.
+- Keep Quarto report source under `reports/`.
+- Do not commit rendered Quarto outputs such as `reports/*.html`,
+  `reports/*.pdf`, `reports/*.docx`, `reports/_site/`, `.quarto/`, or
+  Quarto cache directories.
+- Do not ignore or remove `reports/*.qmd`; those are source files.
+- Update `reports/final_report.qmd` when generated output schemas, filenames,
+  or pipeline stages change.
+- Do not fabricate report results. Reports must read generated tables and
+  figures, and must fail or show an explicit missing-output placeholder when
+  required artifacts are absent.
 - Favor stable filenames and deterministic content.
 - When adding new pipeline stages, emit machine-readable tables before adding
   presentation-only summaries.
@@ -107,4 +117,6 @@ If Docker is available, keep the Docker command passing too.
 
 - Update tests when changing behavior, interfaces, or output contracts.
 - Update `README.md` and relevant docs when the implemented pipeline changes.
+- Keep `pytest` passing.
+- Keep `docker compose up --build reproduce` passing.
 - Prefer documenting what is reproducible now versus what is planned later.

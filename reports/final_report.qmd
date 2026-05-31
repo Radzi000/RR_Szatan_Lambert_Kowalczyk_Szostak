@@ -1,0 +1,498 @@
+---
+title: "Intraday Momentum Reproduction And Extension"
+subtitle: "Final reproducibility report"
+author:
+  - "Eryk Szatan"
+  - "Kacper Lambert"
+  - "Natalia Kowalczyk"
+  - "Radoslaw Szostak"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{python}
+#| label: setup
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pandas as pd
+from IPython.display import Markdown, display
+
+ROOT = Path("..") if Path.cwd().name == "reports" else Path(".")
+DATA = ROOT / "data"
+PROCESSED = DATA / "processed"
+TABLES = ROOT / "outputs" / "tables"
+FIGURES = ROOT / "outputs" / "figures"
+REPORTS = ROOT / "outputs" / "report"
+
+REQUIRED_TABLES = [
+    TABLES / "strategy_summary.csv",
+    TABLES / "reproducibility_manifest.json",
+    TABLES / "fixed_15m_strategy_summary.csv",
+    TABLES / "fixed_15m_train_validation_test_summary.csv",
+    TABLES / "optimization_search_results.csv",
+    TABLES / "selected_params.csv",
+    TABLES / "train_validation_comparison.csv",
+    TABLES / "optimization_verification_metrics.csv",
+    TABLES / "verification_metrics_taken_strats.csv",
+    TABLES / "verification_metrics_our_strats.csv",
+]
+
+missing = [str(path) for path in REQUIRED_TABLES if not path.exists()]
+if missing:
+    raise FileNotFoundError(
+        "The final report cannot be rendered because required generated outputs are missing: "
+        + ", ".join(missing)
+        + ". Regenerate them with: make reproduce-report. If Quarto is not installed, run the "
+        + "pipeline commands documented in README.md and then render with quarto render "
+        + "reports/final_report.qmd."
+    )
+
+
+def rel(path: Path) -> str:
+    return path.as_posix()
+
+
+def doc_rel(path: Path) -> str:
+    root_relative = rel(path)
+    return root_relative if Path.cwd().name == "reports" else "../" + root_relative
+
+
+def read_csv(path: Path, **kwargs) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Required report input is missing: {rel(path)}")
+    return pd.read_csv(path, **kwargs)
+
+
+def md_table(df: pd.DataFrame, max_rows: int = 12) -> None:
+    if df.empty:
+        display(Markdown("_No rows available._"))
+        return
+    shown = df.head(max_rows).copy()
+    shown = shown.where(pd.notna(shown), "")
+    columns = [str(col) for col in shown.columns]
+
+    def fmt(value: object) -> str:
+        if isinstance(value, float):
+            text = f"{value:.6g}"
+        else:
+            text = str(value)
+        return text.replace("|", "\\|").replace("\n", " ")
+
+    header = "| " + " | ".join(columns) + " |"
+    separator = "| " + " | ".join(["---"] * len(columns)) + " |"
+    body = [
+        "| " + " | ".join(fmt(value) for value in row) + " |"
+        for row in shown.itertuples(index=False, name=None)
+    ]
+    display(Markdown("\n".join([header, separator, *body])))
+
+
+def include_figure(path: Path, caption: str) -> None:
+    if path.exists():
+        display(Markdown(f"![{caption}]({doc_rel(path)}){{fig-alt='{caption}'}}"))
+    else:
+        display(Markdown(f"_Figure not generated: `{rel(path)}`._"))
+
+
+def compact_frame(df: pd.DataFrame, preferred: list[str], max_rows: int = 12) -> pd.DataFrame:
+    columns = [col for col in preferred if col in df.columns]
+    if not columns:
+        columns = list(df.columns[: min(8, len(df.columns))])
+    return df[columns].head(max_rows)
+```
+
+## Executive Summary
+
+This repository is a fully local reproduction and extension of five
+QuantConnect-style intraday momentum strategies. QuantConnect is used only as
+the historical source format for the downloaded reference strategy files. The
+canonical reproduction path uses committed data, deterministic Python modules,
+centralized transaction costs, generated tables and figures under `outputs/`,
+and Docker.
+
+The pipeline is:
+
+```text
+data -> preprocessing -> strategy_development -> trade_dependency -> final_portfolio -> outputs
+```
+
+The report reads generated CSV outputs from `outputs/tables/` and embeds PNG
+figures from `outputs/figures/`. It does not fabricate missing metrics. If a
+required output is absent, rendering stops with a message explaining how to
+regenerate the inputs.
+
+## Reproducible Pipeline
+
+The project has three reproducibility layers:
+
+- The canonical Docker command, `docker compose up --build reproduce`, runs the
+  stable 5-minute SPY reproduction path and writes deterministic outputs.
+- The local research extension commands materialize processed 15-minute data,
+  run fixed-parameter baselines, run practical Workstream C optimization, and
+  run the final portfolio layer.
+- The Quarto report is source-only. Rendered HTML, PDF, DOCX, `_site`, and cache
+  artifacts are intentionally excluded from version control.
+
+```bash
+python -m preprocessing.materialize_processed_data
+python -m strategy_development.local_implementation.run_fixed_15m_experiments
+python -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke
+python -m final_portfolio.run_report
+quarto render reports/final_report.qmd
+```
+
+The convenience target is:
+
+```bash
+make reproduce-report
+```
+
+The report target uses the deterministic smoke optimization mode so that report
+generation remains practical. The full research-scale optimization command is
+available separately as
+`python -m strategy_development.local_implementation.optimization.run_all_optimizations`.
+
+## Data
+
+The final pipeline uses committed repository data only. No live downloads,
+QuantConnect cloud APIs, Lean CLI, or manual notebook execution are required.
+The shared OHLCV schema is:
+
+```text
+timestamp, open, high, low, close, volume
+```
+
+```{python}
+#| label: data-inventory
+rows = []
+for path in sorted(DATA.glob("**/*.csv")):
+    if "processed" in path.parts:
+        continue
+    try:
+        frame = pd.read_csv(path)
+    except Exception as exc:
+        rows.append({"dataset": rel(path), "rows": None, "columns": f"read error: {exc}", "start": "", "end": "", "missing_values": ""})
+        continue
+    timestamp_col = "timestamp" if "timestamp" in frame.columns else frame.columns[0]
+    parsed = pd.to_datetime(frame[timestamp_col], errors="coerce")
+    asset_class = path.parent.name
+    frequency = path.parent.parent.name if path.parent.parent.name in {"1day", "5min", "15min"} else path.parent.name
+    rows.append(
+        {
+            "dataset": rel(path),
+            "asset_class": asset_class,
+            "frequency": frequency,
+            "rows": len(frame),
+            "start": parsed.min(),
+            "end": parsed.max(),
+            "missing_values": int(frame.isna().sum().sum()),
+        }
+    )
+data_inventory = pd.DataFrame(rows)
+md_table(data_inventory, max_rows=30)
+```
+
+### Descriptive Statistics
+
+The table below is generated from committed raw OHLCV files. It summarizes the
+numeric columns actually present in the repository.
+
+```{python}
+#| label: describe-summary
+frames = []
+for path in sorted(DATA.glob("**/*.csv")):
+    if "processed" in path.parts:
+        continue
+    frame = pd.read_csv(path)
+    numeric = frame.select_dtypes("number")
+    if numeric.empty:
+        continue
+    desc = numeric.describe().T.reset_index().rename(columns={"index": "column"})
+    desc.insert(0, "dataset", rel(path))
+    frames.append(desc)
+describe_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+md_table(describe_df[["dataset", "column", "count", "mean", "std", "min", "max"]], max_rows=20)
+```
+
+### Processed Data And Splits
+
+Workstream C consumes deterministic processed files under `data/processed/`.
+The A/B handoff consists of the data manifest, global time split file, unified
+CSV files, and split CSV files.
+
+```{python}
+#| label: processed-summary
+processed_files = sorted(PROCESSED.glob("**/*"))
+processed_rows = [
+    {"path": rel(path), "bytes": path.stat().st_size}
+    for path in processed_files
+    if path.is_file()
+]
+md_table(pd.DataFrame(processed_rows), max_rows=25)
+```
+
+```{python}
+#| label: split-summary
+split_path = PROCESSED / "splits" / "global_time_splits.json"
+if split_path.exists():
+    splits = json.loads(split_path.read_text(encoding="utf-8"))
+    display(Markdown("```json\n" + json.dumps(splits, indent=2) + "\n```"))
+else:
+    display(Markdown(f"_Split manifest not found: `{rel(split_path)}`._"))
+```
+
+### Data Provenance And Metadata
+
+The raw data files are committed offline inputs. The manifest below is generated
+deterministically by the preprocessing layer and records reproducibility
+metadata for the canonical output stage.
+
+```{python}
+#| label: manifest
+manifest = json.loads((TABLES / "reproducibility_manifest.json").read_text(encoding="utf-8"))
+display(Markdown("```json\n" + json.dumps(manifest, indent=2) + "\n```"))
+```
+
+### Transaction Costs
+
+Transaction costs are centralized in
+`strategy_development/local_implementation/costs.py` and are applied inside the
+backtest loop, optimization objective, validation verification outputs, and
+reported metrics. The default per-side assumptions are:
+
+- Equities and equity ETFs: 1.0 bps.
+- Commodity ETFs: 1.5 bps.
+- Crypto: 4.0 bps.
+- Fallback: 2.0 bps.
+
+Unless a table explicitly includes gross columns, the reported baseline,
+optimization, and portfolio metrics are net of transaction costs.
+
+## Taken Strategies
+
+The taken strategies are downloaded QuantConnect-style intraday momentum
+strategies preserved under `strategy_development/taken_strategies/` as
+reference-only originals. They provide the source logic and intuition:
+
+- a baseline intraday momentum rule,
+- asymmetric entry and exit timing,
+- an EMA trend filter,
+- exit confirmation logic,
+- and a combined EMA plus confirmation variant.
+
+QuantConnect itself is not required to run the project. The strategies were
+rewritten locally under `strategy_development/local_implementation/`, which is
+the authoritative implementation for reproduction, testing, Docker, and this
+report.
+
+## Performance Of Taken Strategies
+
+The canonical 5-minute SPY reproduction writes `strategy_summary.csv`, equity
+curves, drawdowns, and a reproducibility manifest. The 15-minute fixed baseline
+runner writes cross-asset strategy metrics and split-aware train, validation,
+and test summaries.
+
+```{python}
+#| label: canonical-summary
+strategy_summary = read_csv(TABLES / "strategy_summary.csv")
+md_table(strategy_summary)
+```
+
+```{python}
+#| label: fixed-summary
+fixed_summary = read_csv(TABLES / "fixed_15m_strategy_summary.csv")
+md_table(compact_frame(
+    fixed_summary,
+    ["strategy", "asset", "asset_class", "split", "net_total_return", "net_sharpe", "max_drawdown", "total_transaction_cost"],
+    max_rows=15,
+))
+```
+
+```{python}
+#| label: taken-verification
+taken_metrics = read_csv(TABLES / "verification_metrics_taken_strats.csv")
+md_table(taken_metrics)
+```
+
+```{python}
+#| label: taken-figures
+include_figure(FIGURES / "equity_curves_taken_strats.png", "Taken strategy equity curves")
+include_figure(FIGURES / "drawdowns_taken_strats.png", "Taken strategy drawdowns")
+include_figure(FIGURES / "equity_curves.png", "Canonical SPY equity curves")
+include_figure(FIGURES / "drawdowns.png", "Canonical SPY drawdowns")
+```
+
+## Optimized Strategies
+
+Workstream C optimizes local strategy parameters on the train split only. Test
+and final out-of-sample data are not used during tuning. Validation is used only
+for post-fit verification and parameter selection. Transaction costs are
+included in both the objective function and the reported results.
+
+The optimizer assignment is:
+
+- NES for Strategy0, Strategy1, and Strategy2.
+- CMA-ES for Strategy3 and Strategy4.
+
+The objective is cost-adjusted train net Sharpe. Parameter spaces are defined in
+`strategy_development/local_implementation/optimization/param_spaces.py`; the
+aggregate runner records selected parameters and verification metrics in
+machine-readable CSV outputs.
+
+```{python}
+#| label: selected-params
+selected = read_csv(TABLES / "selected_params.csv")
+md_table(compact_frame(
+    selected,
+    ["strategy", "asset", "asset_class", "optimizer", "objective", "validation_net_sharpe", "params"],
+    max_rows=15,
+))
+```
+
+```{python}
+#| label: optimization-search
+search = read_csv(TABLES / "optimization_search_results.csv")
+summary_cols = [col for col in ["strategy", "asset", "asset_class", "optimizer", "iteration", "candidate", "train_net_sharpe", "objective"] if col in search.columns]
+md_table(search[summary_cols].head(15) if summary_cols else search.head(15))
+```
+
+```{python}
+#| label: train-validation-comparison
+comparison = read_csv(TABLES / "train_validation_comparison.csv")
+md_table(compact_frame(
+    comparison,
+    ["strategy", "asset", "asset_class", "train_net_sharpe", "validation_net_sharpe", "selected"],
+    max_rows=15,
+))
+```
+
+```{python}
+#| label: optimized-verification
+our_metrics = read_csv(TABLES / "verification_metrics_our_strats.csv")
+verification = read_csv(TABLES / "optimization_verification_metrics.csv")
+md_table(compact_frame(
+    verification,
+    ["strategy", "asset", "asset_class", "split", "net_total_return", "net_sharpe", "max_drawdown", "total_transaction_cost"],
+    max_rows=15,
+))
+```
+
+```{python}
+#| label: optimization-figures
+include_figure(FIGURES / "optimization_convergence.png", "Optimization convergence")
+include_figure(FIGURES / "train_validation_sharpe_comparison.png", "Train and validation Sharpe comparison")
+include_figure(FIGURES / "equity_curves_our_strats.png", "Optimized strategy equity curves")
+include_figure(FIGURES / "drawdowns_our_strats.png", "Optimized strategy drawdowns")
+include_figure(FIGURES / "equity_curves_our_strats_train.png", "Optimized strategy train equity curves")
+include_figure(FIGURES / "equity_curves_our_strats_validation.png", "Optimized strategy validation equity curves")
+```
+
+## Final Portfolio
+
+The final portfolio layer consumes `outputs/tables/equity_curves_our_strats.csv`
+from Workstream C and compares:
+
+- equal weights,
+- Markowitz maximum-Sharpe allocation,
+- Kelly-style allocation,
+- dependency-adjusted Kelly and Markowitz variants.
+
+Grid-search selection is performed on the train split. The currently generated
+portfolio figures and markdown report describe validation-period evaluation,
+not a test/OOS claim.
+
+```{python}
+#| label: portfolio-status
+portfolio_figures = [
+    FIGURES / "final_portfolio_comparison.png",
+    FIGURES / "final_portfolio_timeline.png",
+    FIGURES / "final_portfolio_equal_weight_train.png",
+    FIGURES / "final_portfolio_grid_search.png",
+    FIGURES / "final_portfolio_acf.png",
+    FIGURES / "final_portfolio_drawdowns_val.png",
+]
+portfolio_report = REPORTS / "final_portfolio_report.md"
+missing_portfolio = [path for path in portfolio_figures + [portfolio_report] if not path.exists()]
+if missing_portfolio:
+    display(Markdown(
+        "Final portfolio outputs are not fully available. Generate them with "
+        "`python -m final_portfolio.run_report` after Workstream C outputs exist. "
+        "Missing files: " + ", ".join(f"`{rel(path)}`" for path in missing_portfolio)
+    ))
+else:
+    display(Markdown("Final portfolio outputs were found and are embedded below."))
+```
+
+```{python}
+#| label: portfolio-figures
+for fig_path, caption in [
+    (FIGURES / "final_portfolio_comparison.png", "Final portfolio method comparison"),
+    (FIGURES / "final_portfolio_timeline.png", "Final portfolio timeline"),
+    (FIGURES / "final_portfolio_equal_weight_train.png", "Equal-weight train portfolio"),
+    (FIGURES / "final_portfolio_grid_search.png", "Final portfolio grid search"),
+    (FIGURES / "final_portfolio_acf.png", "Trade dependency autocorrelation"),
+    (FIGURES / "final_portfolio_drawdowns_val.png", "Validation drawdown comparison"),
+]:
+    include_figure(fig_path, caption)
+```
+
+```{python}
+#| label: portfolio-report
+if portfolio_report.exists():
+    text = portfolio_report.read_text(encoding="utf-8")
+    display(Markdown(text))
+```
+
+## Reproducibility
+
+The main Docker path remains stable and intentionally does not require Quarto:
+
+```bash
+docker compose up --build reproduce
+```
+
+Local verification commands:
+
+```bash
+pytest
+python -m strategy_development.local_implementation.reproduce
+docker compose config
+docker compose up --build reproduce
+```
+
+Report generation commands:
+
+```bash
+make reproduce-report
+make report
+quarto render reports/final_report.qmd
+```
+
+Expected output locations:
+
+- generated pipeline tables: `outputs/tables/`
+- generated pipeline figures: `outputs/figures/`
+- generated markdown reports: `outputs/report/`
+- rendered Quarto HTML: `reports/final_report.html`
+
+Rendered Quarto outputs are not committed. The source of record is
+`reports/final_report.qmd` plus the deterministic code and generated
+machine-readable outputs.
+
+The CI workflow runs Python dependency installation, `pytest`, Docker Compose
+configuration validation, and the deterministic local reproduction command. It
+avoids full optimization so that pull-request checks stay practical.
+
+AI assistance is disclosed in `AI_USAGE.md`.

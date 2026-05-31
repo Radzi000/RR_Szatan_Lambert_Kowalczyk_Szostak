@@ -40,6 +40,15 @@ outputs/*
 !outputs/manifests/
 !outputs/manifests/.gitkeep
 
+# Quarto rendered reports and caches
+reports/_site/
+reports/*.html
+reports/*.pdf
+reports/*.docx
+reports/*_files/
+.quarto/
+*_cache/
+
 # Sphinx build
 docs/_build/
 
@@ -49,3 +58,6 @@ Thumbs.db
 
 # Docker
 *.log
+
+/.quarto/
+**/*.quarto_ipynb
