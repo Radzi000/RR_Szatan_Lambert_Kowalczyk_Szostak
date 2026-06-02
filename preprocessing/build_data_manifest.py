@@ -141,6 +141,49 @@ def build_data_manifest(
     return manifest_path
 
 
+def verify_data_manifest(
+    manifest_path: Path = DEFAULT_OUTPUT_DIR / "data_manifest.json",
+    project_root: Path = PROJECT_ROOT,
+    *,
+    strict: bool = True,
+) -> list[dict[str, str]]:
+    """Verify committed data files still match the SHA256 checksums in the manifest.
+
+    For every asset listed in the manifest, recompute the SHA256 of its source
+    file and compare it to the stored checksum. Returns a list of problem records
+    (empty when everything matches). With ``strict=True`` it raises ``ValueError``
+    if any file is missing or its checksum differs from the recorded one.
+    """
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    problems: list[dict[str, str]] = []
+    for entry in manifest["assets"]:
+        file_path = project_root / entry["source_file"]
+        if not file_path.exists():
+            problems.append(
+                {
+                    "source_file": entry["source_file"],
+                    "problem": "missing",
+                    "expected": entry["sha256"],
+                    "actual": "",
+                }
+            )
+            continue
+        actual = sha256_file(file_path)
+        if actual != entry["sha256"]:
+            problems.append(
+                {
+                    "source_file": entry["source_file"],
+                    "problem": "checksum_mismatch",
+                    "expected": entry["sha256"],
+                    "actual": actual,
+                }
+            )
+    if strict and problems:
+        details = "; ".join(f"{p['source_file']} ({p['problem']})" for p in problems)
+        raise ValueError(f"Data integrity check failed against {manifest_path.name}: {details}")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for deterministic data-manifest generation."""
     parser = argparse.ArgumentParser(description="Build a deterministic manifest for committed raw data.")
