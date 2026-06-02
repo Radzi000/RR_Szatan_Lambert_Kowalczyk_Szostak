@@ -121,6 +121,59 @@ def frequency_from_path(path: Path) -> str:
     return "unknown"
 
 
+DATETIME_COLUMNS = ["timestamp", "datetime", "date", "Date", "Datetime", "time", "Time"]
+
+
+def parse_datetime_values(values: pd.Series) -> pd.Series:
+    """Parse common timestamp formats used by the committed raw CSV files."""
+    cleaned = values.astype(str).str.strip().str.replace(
+        r"\s+(US/Eastern|US/Central|US/Mountain|US/Pacific|UTC)$",
+        "",
+        regex=True,
+    )
+    parsed = pd.to_datetime(cleaned, format="%Y%m%d %H:%M:%S", errors="coerce")
+    if parsed.notna().mean() > 0.8:
+        return parsed
+    return pd.to_datetime(cleaned, errors="coerce")
+
+
+def find_datetime_column(df: pd.DataFrame) -> str | None:
+    for col in DATETIME_COLUMNS:
+        if col in df.columns:
+            return col
+    if df.empty or len(df.columns) == 0:
+        return None
+    first_col = df.columns[0]
+    parsed = parse_datetime_values(df[first_col])
+    if parsed.notna().mean() > 0.8:
+        return first_col
+    return None
+
+
+def format_timestamp(value: object) -> str:
+    if pd.isna(value):
+        return "unknown"
+    return pd.Timestamp(value).strftime("%Y-%m-%d %H:%M")
+
+
+def infer_start_end_from_frame(df: pd.DataFrame) -> tuple[str, str]:
+    dt_col = find_datetime_column(df)
+    if dt_col is None:
+        return "unknown", "unknown"
+    parsed = parse_datetime_values(df[dt_col]).dropna()
+    if parsed.empty:
+        return "unknown", "unknown"
+    return format_timestamp(parsed.iloc[0]), format_timestamp(parsed.iloc[-1])
+
+
+def infer_start_end_from_csv(path: Path) -> tuple[str, str]:
+    try:
+        frame = pd.read_csv(path)
+    except Exception:
+        return "unknown", "unknown"
+    return infer_start_end_from_frame(frame)
+
+
 def clean_asset_labels(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     path_like = [
@@ -420,21 +473,20 @@ for path in sorted(DATA.glob("**/*.csv")):
             "asset_class": asset_class_from_path(path),
             "frequency": frequency_from_path(path),
             "rows": "",
-            "start": "",
-            "end": "",
+            "start": "unknown",
+            "end": "unknown",
             "missing_values": f"read error: {exc}",
         })
         continue
-    timestamp_col = "timestamp" if "timestamp" in frame.columns else frame.columns[0]
-    parsed = pd.to_datetime(frame[timestamp_col], errors="coerce")
+    start, end = infer_start_end_from_frame(frame)
     rows.append(
         {
             "asset": asset_from_path(path),
             "asset_class": asset_class_from_path(path),
             "frequency": frequency_from_path(path),
             "rows": len(frame),
-            "start": parsed.min(),
-            "end": parsed.max(),
+            "start": start,
+            "end": end,
             "missing_values": int(frame.isna().sum().sum()),
         }
     )
@@ -457,12 +509,15 @@ for path in sorted(DATA.glob("**/*.csv")):
     numeric = frame.select_dtypes("number")
     if numeric.empty:
         continue
+    start, end = infer_start_end_from_frame(frame)
     desc = numeric.describe().T.reset_index().rename(columns={"index": "column"})
     desc.insert(0, "asset_class", asset_class_from_path(path))
     desc.insert(0, "asset", asset_from_path(path))
+    desc.insert(2, "start", start)
+    desc.insert(3, "end", end)
     frames.append(desc)
 describe_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-md_table(describe_df[["asset", "asset_class", "column", "count", "mean", "std", "min", "max"]], max_rows=40)
+md_table(describe_df[["asset", "asset_class", "start", "end", "column", "count", "mean", "std", "min", "max"]], max_rows=40)
 ```
 
 ### Processed Data And Splits
