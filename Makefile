@@ -80,6 +80,9 @@ docker-test:  ## Run tests inside Docker
 docker-reproduce:  ## Build the image and run the deterministic pipeline in Docker
 	docker compose up --build reproduce
 
+docker-report:  ## Build the image and render the full Quarto report in Docker
+	docker compose up --build report
+
 clean:  ## Remove caches, build products, and generated outputs
 	$(PYTHON) -c "from pathlib import Path; import shutil; \
 root = Path('.'); \
