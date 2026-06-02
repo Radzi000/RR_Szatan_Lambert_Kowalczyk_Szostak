@@ -1,6 +1,6 @@
 .PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report report-clean report-quarto reproduce reproduce-report final-portfolio docker-build docker-test docker-reproduce clean
 
-PYTHON ?= python
+PYTHON ?= python3
 PIP ?= pip
 
 help:  ## Show this help message
