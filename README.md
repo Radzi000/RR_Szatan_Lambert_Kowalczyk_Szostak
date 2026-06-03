@@ -1,14 +1,75 @@
 # Intraday Momentum Reproduction And Extension
 
-This repository is a course project for **Reproducible Research 2026** at the
-University of Warsaw (Jan Kozubowski). It reproduces and extends five
-QuantConnect-style intraday momentum strategies from the upstream project
+This repository is a **Reproducible Research 2026** course project at the
+University of Warsaw. It reproduces and extends five QuantConnect-style
+intraday momentum strategies from
 [`blackswan-quants/intraday-momentum`](https://github.com/blackswan-quants/intraday-momentum)
-with a fully local, deterministic, Dockerized workflow.
+using committed offline data, committed result artifacts, and a Dockerized
+Quarto report renderer.
 
-# How to run this
+## Quick Start For Reviewers
+
+The reviewer workflow is Docker-only:
+
+```bash
+docker pull <dockerhub-user>/intraday-momentum-repro:latest
+docker run --rm -v "$PWD/reproduction-artifacts:/artifacts" <dockerhub-user>/intraday-momentum-repro:latest
+```
+
+Windows PowerShell:
+
+```powershell
+docker pull <dockerhub-user>/intraday-momentum-repro:latest
+docker run --rm -v "${PWD}\reproduction-artifacts:/artifacts" <dockerhub-user>/intraday-momentum-repro:latest
+```
+
+Expected output:
+
+```text
+reproduction-artifacts/reports/final_report.html
+reproduction-artifacts/outputs/
+```
+
+No local Python, Quarto, notebooks, QuantConnect, Lean CLI, or manual data
+downloads are required.
+
+## What Docker Does
+
+The Docker image contains the complete committed repository contents, including
+`outputs/`. Those committed outputs are intentional: they are the canonical
+inputs used by the final report.
+
+The default container command only renders:
+
+```bash
 quarto render reports/final_report.qmd
-start reports\final_report.html
+```
+
+Then it exports:
+
+- `reports/final_report.html` to `reproduction-artifacts/reports/final_report.html`
+- committed `outputs/` to `reproduction-artifacts/outputs/`
+
+The reviewer Docker command does **not** rerun preprocessing, strategy
+experiments, optimizations, or portfolio construction. It renders the Quarto
+report from the existing committed artifacts.
+
+## Repository Structure
+
+```text
+data/                         Committed raw and processed datasets
+preprocessing/                Deterministic data manifest and split utilities
+strategy_development/         Reference strategies and local implementation
+trade_dependency/             Trade autocorrelation analysis code
+final_portfolio/              Portfolio construction code
+outputs/                      Committed canonical report inputs
+reports/final_report.qmd      Final Quarto report source
+tests/                        Offline smoke tests
+Dockerfile                    Docker image definition
+docker-compose.yml            Optional local developer services
+scripts/docker_render_report.sh
+AI_USAGE.md                   AI usage disclosure
+```
 
 ## Research Question
 
@@ -19,180 +80,7 @@ Do simple intraday momentum rules on SPY remain competitive when extended with:
 - exit confirmation logic,
 - and a combined EMA plus confirmation variant?
 
-## Team Members
-
-- Eryk Szatan
-- Kacper Lambert
-- Natalia Kowalczyk
-- Radoslaw Szostak
-
-## Project Story
-
-The repository is organized around one research pipeline:
-
-```text
-data
--> preprocessing
--> strategy_development
--> trade_dependency
--> final_portfolio
--> outputs
-```
-
-Within that pipeline:
-
-- the original downloaded QuantConnect-style strategies are preserved as
-  reference-only artifacts under `strategy_development/taken_strategies/`,
-- the authoritative local implementation lives under
-  `strategy_development/local_implementation/`,
-- the local Docker pipeline is the only execution path required for grading.
-
-Current implementation boundary:
-
-- Workstream A preprocessing artifacts are materialized under `data/processed/`
-- Workstream B includes a fixed-parameter 15-minute cross-asset runner
-- Workstream C now consumes those deterministic A/B outputs for train-only
-  optimization and validation verification
-
-## Upstream Project Reproduced
-
-- Original reference: `blackswan-quants/intraday-momentum`
-- Original downloaded QuantConnect-style strategy files are preserved under
-  `strategy_development/taken_strategies/`.
-- The authoritative local implementation lives in
-  `strategy_development/local_implementation/`.
-
-## QuantConnect Status
-
-QuantConnect is treated as a **source/reference format only**.
-
-This repository does **not** depend on:
-
-- QuantConnect cloud,
-- QuantConnect APIs,
-- Lean CLI,
-- a QuantConnect account,
-- public QuantConnect backtests at runtime.
-
-The local Docker pipeline is authoritative for grading and reproducibility.
-
-## One-Command Reproduction
-
-```bash
-git clone <repo-url>
-cd RR_Szatan_Lambert_Kowalczyk_Szostak
-docker compose up --build reproduce
-```
-
-This is the primary grading workflow. It:
-
-- builds the Docker image,
-- runs `python -m strategy_development.local_implementation.reproduce`,
-- uses committed data only,
-- generates deterministic outputs under `outputs/`,
-- does not require QuantConnect,
-- requires no notebooks and no local Python installation.
-
-## Final Quarto Report
-
-The final report source is [reports/final_report.qmd](reports/final_report.qmd).
-It is written in English and reads generated CSV outputs from `outputs/tables/`
-and generated PNG figures from `outputs/figures/`. It does not contain copied
-or fabricated result tables.
-
-Rendered Quarto outputs are intentionally not committed. Files such as
-`reports/*.html`, `reports/*.pdf`, `reports/*.docx`, `reports/_site/`,
-`.quarto/`, and Quarto cache directories are generated artifacts and are ignored
-by Git. The committed source is the `.qmd` file plus deterministic code,
-configuration, and documentation.
-
-Prerequisites for local report rendering:
-
-- Python 3.10+ environment with project dependencies
-- report extras: `pip install -e ".[report]"`
-- local Quarto installation from https://quarto.org
-
-Generate the report inputs and render the report:
-
-```bash
-make reproduce-report
-```
-
-Render only, after outputs already exist:
-
-```bash
-make report
-quarto render reports/final_report.qmd
-```
-
-Clean rendered report artifacts:
-
-```bash
-make report-clean
-```
-
-With the current Quarto config, local rendering writes:
-
-- `reports/final_report.html`
-
-The main Docker reproduce command does not render Quarto and does not install
-Quarto. This keeps the canonical Docker path stable and focused on the
-deterministic pipeline:
-
-```bash
-docker compose up --build reproduce
-```
-
-## Expected Outputs
-
-After a successful run, the repository writes:
-
-- `outputs/tables/strategy_summary.csv`
-- `outputs/tables/strategy_summary.md`
-- `outputs/tables/reproducibility_manifest.json`
-- `outputs/figures/equity_curves.png`
-- `outputs/figures/drawdowns.png`
-- `outputs/report/final_report.md`
-
-Additional A/B handoff outputs for the 15-minute cross-asset baseline are
-generated by the separate fixed-baseline runner:
-
-- `outputs/tables/fixed_15m_strategy_summary.csv`
-- `outputs/tables/fixed_15m_strategy_returns.csv`
-- `outputs/tables/fixed_15m_trade_logs.csv`
-- `outputs/tables/fixed_15m_train_validation_test_summary.csv`
-
-Final portfolio outputs are generated by `make final-portfolio`:
-
-- `outputs/figures/final_portfolio_comparison.png`
-- `outputs/figures/final_portfolio_timeline.png`
-- `outputs/figures/final_portfolio_equal_weight_train.png`
-- `outputs/figures/final_portfolio_grid_search.png`
-- `outputs/figures/final_portfolio_acf.png`
-- `outputs/figures/final_portfolio_drawdowns_val.png`
-- `outputs/report/final_portfolio_report.md`
-
-Workstream C optimization outputs are generated by the aggregate optimization
-runner:
-
-- `outputs/tables/optimization_search_results.csv`
-- `outputs/tables/selected_params.csv`
-- `outputs/tables/train_validation_comparison.csv`
-- `outputs/tables/optimization_verification_metrics.csv`
-- `outputs/tables/verification_metrics_our_strats.csv`
-- `outputs/tables/equity_curves_our_strats.csv`
-- `outputs/tables/drawdowns_our_strats.csv`
-- `outputs/tables/equity_drawdown_our_strats_aggregated.csv`
-- `outputs/figures/optimization_convergence.png`
-- `outputs/figures/train_validation_sharpe_comparison.png`
-- `outputs/figures/equity_curves_our_strats.png`
-- `outputs/figures/drawdowns_our_strats.png`
-- `outputs/figures/equity_curves_our_strats_train.png`
-- `outputs/figures/equity_curves_our_strats_validation.png`
-- `outputs/figures/drawdowns_our_strats_train.png`
-- `outputs/figures/drawdowns_our_strats_validation.png`
-
-## Strategy Variants Included
+The included strategy variants are:
 
 - `Strategy0 / Baseline`
 - `Strategy1 / Asymmetric Intervals`
@@ -200,341 +88,109 @@ runner:
 - `Strategy3 / Exit Confirmation`
 - `Strategy4 / EMA + Confirmation`
 
-## Repository Structure
+## Data And Reproducibility Assumptions
 
-```text
-data/                               Committed baseline and extension datasets
-preprocessing/                      Deterministic data manifest, validation, and split helpers
-strategy_development/               Original reference strategies plus local implementation
-trade_dependency/                   Trade autocorrelation analysis (used by final_portfolio)
-final_portfolio/                    Portfolio construction: equal-weight, Kelly, Markowitz
-outputs/                            Generated reproducible artifacts
-tests/                              Offline smoke tests
-docs/                               Useful project documentation
-Dockerfile                          Docker image definition
-docker-compose.yml                  Canonical reproducible services
-Makefile                            Convenience commands
-AI_USAGE.md                         AI disclosure statement
-```
+The project uses committed offline data only. The report and Docker reviewer
+workflow do not perform live downloads.
 
-## Data
-
-The final reproducible pipeline uses committed repository data only.
+Committed data includes:
 
 - `data/1day/spy_daily.csv`
-  Source: Yahoo Finance SPY daily OHLCV export.
-  Date range: 2017-01-03 to 2026-05-01.
-
 - `data/5min/spy_5m.csv`
-  Source: Yahoo Finance SPY 5-minute OHLCV export.
-  Date range: 2026-02-06 14:30:00+00:00 to 2026-05-04 14:15:00+00:00.
-
 - `data/15min/equities/`
-  Committed 15-minute equity data used for the broader research extension.
-
 - `data/15min/commodities/`
-  Committed 15-minute commodity ETF proxy data used for the broader research
-  extension.
-
 - `data/15min/crypto/`
-  Committed 15-minute crypto data used for the broader research extension.
+- processed handoff files under `data/processed/`
 
-- `5m SPY` is the faithful local reproduction baseline.
-- `15m` is the intended main research extension frequency.
-- `30m` data is not required for this repository.
+`outputs/` is committed intentionally. It contains the tables, figures, and
+markdown summaries read by `reports/final_report.qmd`. Rendered Quarto outputs
+such as `reports/*.html`, `reports/*.pdf`, `.quarto/`, and report cache
+directories are not committed.
 
-- No manual download is required.
-- No internet is needed in reproduce mode.
-- The pipeline does not depend on Google Drive, Kaggle, or live `yfinance`.
-
-Additional details are documented in [data/README.md](data/README.md).
+QuantConnect is treated as a source/reference format only. The project does not
+depend on QuantConnect cloud, QuantConnect APIs, Lean CLI, a QuantConnect
+account, or public QuantConnect backtests at runtime.
 
 ## Local Development
 
-```bash
-make dev
-make test
-make data-manifest
-make splits
-make preprocess
-make fixed-15m
-make optimize
-make optimize-smoke
-make results
-make reproduce-report
-make report
-make reproduce
-```
-
-Main targets:
-
-- `make data-manifest` builds a deterministic raw-data manifest
-- `make splits` computes deterministic global split boundaries for the 15-minute extension layer
-- `make preprocess` runs both preprocessing steps
-- `make preprocess` also materializes unified and split 15-minute CSVs
-- `make fixed-15m` runs the deterministic fixed-parameter 15-minute baseline suite
-- `make optimize` runs the Workstream C train/validation optimization suite
-- `make optimize-smoke` runs a faster smoke-mode Workstream C optimization suite
-- `make results` runs the full cost-aware baseline plus optimization result generation
-- `make report` renders `reports/final_report.qmd` with Quarto
-- `make report-clean` removes rendered Quarto report artifacts only
-- `make reproduce-report` regenerates report inputs with deterministic
-  preprocessing, fixed-baseline, practical smoke optimization, final portfolio,
-  and Quarto render steps
-- `make reproduce` runs `python -m strategy_development.local_implementation.reproduce`
-- `make final-portfolio` runs the final portfolio construction: grid search, figures, and report
-- `make test` runs the offline pytest suite
-- `make docker-reproduce` runs `docker compose up --build reproduce`
-- `make docker-test` runs pytest inside Docker
-
-## Docker
-
-Primary command:
-
-```bash
-docker compose up --build reproduce
-```
-
-Canonical local verification commands:
+Reviewer reproduction does not require these commands. They are for maintainers
+who want to inspect or regenerate artifacts locally.
 
 ```bash
 pytest
 python -m strategy_development.local_implementation.reproduce
 python -m strategy_development.local_implementation.run_fixed_15m_experiments
 python -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke
-docker compose up --build reproduce
+python -m final_portfolio.run_report
+quarto render reports/final_report.qmd
 ```
 
-Expected runtime behavior:
-
-- Docker builds `intraday-momentum-repro` from the local `Dockerfile`
-- the container runs `python -m strategy_development.local_implementation.reproduce`
-- outputs are written to the host-mounted `outputs/` directory
-- the `reproduce` container exits with code `0` on success
-
-Expected outputs on the host:
-
-- `outputs/tables/strategy_summary.csv`
-- `outputs/tables/strategy_summary.md`
-- `outputs/tables/reproducibility_manifest.json`
-- `outputs/figures/equity_curves.png`
-- `outputs/figures/drawdowns.png`
-- `outputs/report/final_report.md`
-
-The 15-minute fixed-baseline runner is intentionally a separate command for
-now because it is materially slower than the 5-minute SPY reproduce baseline.
-It writes:
-
-- `outputs/tables/fixed_15m_strategy_summary.csv`
-- `outputs/tables/fixed_15m_strategy_returns.csv`
-- `outputs/tables/fixed_15m_trade_logs.csv`
-- `outputs/tables/fixed_15m_train_validation_test_summary.csv`
-
-Those baseline outputs are now net of centralized transaction costs by default.
-The default per-side assumptions are:
-
-- equities and equity ETFs: `1.0` bps
-- commodity ETFs: `1.5` bps
-- crypto: `4.0` bps
-- fallback: `2.0` bps
-
-The same cost model is used inside:
-
-- the 5-minute SPY baseline reproduce path
-- the 15-minute fixed baseline runner
-- the Workstream C train objective
-- the Workstream C validation verification outputs
-
-Workstream C optimization is intentionally separate from the canonical
-`reproduce` command because the full optimization pass is slower. The aggregate
-runner writes:
-
-- `outputs/tables/optimization_search_results.csv`
-- `outputs/tables/selected_params.csv`
-- `outputs/tables/train_validation_comparison.csv`
-- `outputs/tables/optimization_verification_metrics.csv`
-- `outputs/tables/equity_drawdown_our_strats_aggregated.csv`
-- `outputs/figures/optimization_convergence.png`
-- `outputs/figures/train_validation_sharpe_comparison.png`
-- `outputs/figures/equity_curves_our_strats_train.png`
-- `outputs/figures/equity_curves_our_strats_validation.png`
-- `outputs/figures/drawdowns_our_strats_train.png`
-- `outputs/figures/drawdowns_our_strats_validation.png`
-
-Optimization commands:
+Equivalent Make targets:
 
 ```bash
-python -m strategy_development.local_implementation.optimization.run_strategy1_nes
-python -m strategy_development.local_implementation.optimization.run_strategy2_nes
-python -m strategy_development.local_implementation.optimization.run_strategy3_nes
-python -m strategy_development.local_implementation.optimization.run_strategy4_cmaes
-python -m strategy_development.local_implementation.optimization.run_strategy5_cmaes
-python -m strategy_development.local_implementation.optimization.run_all_optimizations
-python -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke
+make test
+make reproduce
+make fixed-15m
+make optimize-smoke
+make final-portfolio
+make report
 ```
 
-Notes on those files:
-
-- they are deterministic and offline-only
-- they use fixed strategy parameters only
-- they respect train/validation/test split boundaries
-- they do not perform optimization
-- `fixed_15m_strategy_returns.csv` is event-driven from the local backtest
-  equity curve, not a full mark-to-market bar-by-bar return stream
-
-Workstream C discipline:
-
-- NES is used for Strategy0, Strategy1, and Strategy2
-- CMA-ES is used for Strategy3 and Strategy4
-- optimization uses cost-adjusted train net Sharpe only
-- validation is used only for cost-adjusted verification and parameter selection
-- test/OOS is reserved for a later final evaluation stage
-- the optimization stage does not use QuantConnect or live downloads
-- train and validation charts are generated separately so split equity curves
-  are not misleadingly stitched into one timeline
-
-Clean rebuild and rerun:
+Local Docker build and report render:
 
 ```bash
-docker compose down
-docker compose build --no-cache
-docker compose up reproduce
+docker build -t intraday-momentum-repro .
+docker run --rm -v "$PWD/reproduction-artifacts:/artifacts" intraday-momentum-repro
 ```
 
-Optional:
+Optional developer Compose services remain available, but they are not the
+primary reviewer workflow:
 
 ```bash
 docker compose run --rm test
-docker compose run --rm optimization
-docker run --rm -v ${PWD}/outputs:/app/outputs intraday-momentum-repro
+docker compose up --build report
 ```
 
-Quarto rendering is local by default:
+## Maintainer Docker Publish
+
+Replace `<dockerhub-user>` with the publishing account:
 
 ```bash
-pip install -e ".[report]"
-make reproduce-report
+docker build -t <dockerhub-user>/intraday-momentum-repro:latest .
+docker push <dockerhub-user>/intraday-momentum-repro:latest
 ```
 
-Remove stale containers, networks, and the local image:
+After publishing, reviewers should use the two-command Docker Hub workflow at
+the top of this README.
 
-```bash
-docker compose down --remove-orphans
-docker rmi intraday-momentum-repro
-```
+## Team Members
 
-If a Docker Hub image is published later, it can be documented here as a stable
-pull target. At the moment, the repository build is the canonical workflow.
+- Eryk Szatan
+- Kacper Lambert
+- Natalia Kowalczyk
+- Radoslaw Szostak
 
-## Windows Docker Setup
-
-For Windows contributors, the practical setup is:
-
-1. Install Docker Desktop.
-2. Enable WSL2 in Docker Desktop if prompted.
-3. Ensure Docker is using Linux containers, not Windows containers.
-4. Start Docker Desktop and wait until it reports that Docker is running.
-5. Verify the daemon:
-
-```powershell
-docker version
-docker info
-docker compose version
-```
-
-6. Verify this repository:
-
-```powershell
-docker compose config
-docker compose up --build reproduce
-python -m strategy_development.local_implementation.run_fixed_15m_experiments
-```
-
-If `docker version` shows a client but no server, Docker Desktop is installed
-but the Linux daemon is not running yet. Start Docker Desktop and retry until
-`docker info` shows a live server.
-
-## Reproducibility Checklist
-
-- committed input data in the repository
-- deterministic preprocessing utilities in `preprocessing/`
-- materialized processed-data contract under `data/processed/`
-- deterministic CLI pipeline in `python -m strategy_development.local_implementation.reproduce`
-- deterministic fixed 15-minute baseline in
-  `python -m strategy_development.local_implementation.run_fixed_15m_experiments`
-- Docker environment for grading
-- source-only Quarto report in `reports/final_report.qmd`
-- rendered Quarto files excluded from version control
-- fixed strategy parameters
-- stable output filenames under `outputs/`
-- offline smoke tests
-
-## Continuous Integration
-
-GitHub Actions CI is defined in `.github/workflows/ci.yml` and runs on `push`
-and `pull_request`. The workflow installs the project, runs `pytest`, validates
-`docker compose config`, runs the deterministic local reproduction command, and
-builds the Docker `reproduce` service. CI intentionally avoids full Workstream C
-optimization because the full research-scale search is slower than practical
-pull-request checks.
-
-## Workstream C Inputs
-
-Workstream C should consume these deterministic A/B outputs:
-
-- `data/processed/manifests/data_manifest.json`
-- `data/processed/splits/global_time_splits.json`
-- `data/processed/unified/*.csv`
-- `data/processed/splits/csv/*.csv`
-- `outputs/tables/fixed_15m_strategy_summary.csv`
-- `outputs/tables/fixed_15m_strategy_returns.csv`
-- `outputs/tables/fixed_15m_trade_logs.csv`
-- `outputs/tables/fixed_15m_train_validation_test_summary.csv`
-- `outputs/tables/optimization_search_results.csv`
-- `outputs/tables/selected_params.csv`
-- `outputs/tables/train_validation_comparison.csv`
-- `outputs/tables/optimization_verification_metrics.csv`
-- `outputs/tables/verification_metrics_taken_strats.csv`
-- `outputs/tables/verification_metrics_our_strats.csv`
-
-Rules for C:
-
-- use train only for optimization
-- use validation only for model/parameter selection
-- keep test for final OOS evaluation only
-- do not add live downloads or QuantConnect dependencies
-- keep transaction costs inside the backtest loop and optimize net metrics
-
-Quarto report skeleton:
-
-- `reports/workstream_c_optimization_report.qmd`
-- optional render command:
-  `quarto render reports/workstream_c_optimization_report.qmd`
-
-## AI Usage Disclosure
+## AI Usage
 
 AI usage is disclosed in [AI_USAGE.md](AI_USAGE.md).
 
 ## Citations And Sources
 
-- `blackswan-quants/intraday-momentum`, upstream strategy reference:
-  https://github.com/blackswan-quants/intraday-momentum
-- Yahoo Finance and other committed local OHLCV exports used for the data files
-  stored in `data/`.
+- Upstream strategy reference:
+  [`blackswan-quants/intraday-momentum`](https://github.com/blackswan-quants/intraday-momentum)
+- Yahoo Finance and other offline OHLCV exports are stored as committed files
+  under `data/`.
 
 ## Known Limitations
 
-- The final grading workflow is based on the committed 5-minute SPY file rather
-  than a larger intraday baseline.
-- The broader 15-minute cross-asset extension is not yet the canonical Docker
-  reproduce workflow.
-- The full Workstream C optimization run is intentionally separate from the
-  canonical Docker reproduce workflow because it is materially slower than the
-  baseline smoke service.
-- Daily data is excluded from the new cost-aware taken/our strategy curve plots
-  because the current strategy logic is intraday-specific.
-- Intraday history is limited to the committed files, so the project favors
-  deterministic reproducibility over unrestricted data coverage.
+- The reviewer Docker workflow renders the final report from committed
+  artifacts; it does not recompute the full research pipeline.
+- Intraday history is limited to the committed files, favoring deterministic
+  reproducibility over unrestricted data coverage.
+- Validation results are used for model and parameter selection; final
+  out-of-sample claims should be read with that boundary in mind.
+- Daily data is excluded from some cost-aware strategy curve plots because the
+  implemented strategy logic is intraday-specific.
 
 ## Acknowledgment Guidance
 

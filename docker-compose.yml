@@ -48,13 +48,5 @@ services:
       dockerfile: Dockerfile
     image: intraday-momentum-repro
     volumes:
-      - ./outputs:/app/outputs
-      - ./reports:/app/reports
-    command: >
-      bash -c "
-        python -m preprocessing.materialize_processed_data &&
-        python -m strategy_development.local_implementation.run_fixed_15m_experiments &&
-        python -m strategy_development.local_implementation.optimization.run_all_optimizations --smoke &&
-        python -m final_portfolio.run_report &&
-        quarto render reports/final_report.qmd
-      "
+      - ./reproduction-artifacts:/artifacts
+    command: sh scripts/docker_render_report.sh

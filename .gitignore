@@ -29,6 +29,7 @@ htmlcov/
 data_cache/
 
 # Outputs
+reproduction-artifacts/
 outputs/*
 !outputs/.gitkeep
 !outputs/tables/
