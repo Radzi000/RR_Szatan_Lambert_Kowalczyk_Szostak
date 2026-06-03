@@ -7,6 +7,19 @@ intraday momentum strategies from
 using committed offline data, committed result artifacts, and a Dockerized
 Quarto report renderer.
 
+## Local Docker build and report render:
+
+```bash
+docker build -t intraday-momentum-repro .
+docker run --rm -v "$PWD/reproduction-artifacts:/artifacts" intraday-momentum-repro
+```
+
+You open the quarto report:
+```bash
+start reproduction-artifacts\reports\final_report.html
+```
+
+
 ## Quick Start For Reviewers
 
 The reviewer workflow is Docker-only:
@@ -134,21 +147,6 @@ make fixed-15m
 make optimize-smoke
 make final-portfolio
 make report
-```
-
-Local Docker build and report render:
-
-```bash
-docker build -t intraday-momentum-repro .
-docker run --rm -v "$PWD/reproduction-artifacts:/artifacts" intraday-momentum-repro
-```
-
-Optional developer Compose services remain available, but they are not the
-primary reviewer workflow:
-
-```bash
-docker compose run --rm test
-docker compose up --build report
 ```
 
 ## Maintainer Docker Publish
