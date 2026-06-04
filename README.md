@@ -19,6 +19,9 @@ You open the quarto report:
 start reproduction-artifacts\reports\final_report.html
 ```
 
+# Dockerhub
+docker pull radek1715/intraday-momentum-repro:latest
+docker run --rm radek1715/intraday-momentum-repro:latest
 
 ## Quick Start For Reviewers
 
