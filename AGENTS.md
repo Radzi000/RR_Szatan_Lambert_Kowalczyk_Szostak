@@ -31,6 +31,15 @@ If Docker is available, keep the Docker command passing too.
 
 ## Non-Negotiable Rules
 
+- The Docker Hub image's default `docker run` must always execute the
+  lightweight `python -m strategy_development.local_implementation.reproduce`
+  pipeline.
+- The default Docker `CMD` must never invoke Quarto, Jupyter, or report
+  generation.
+- Quarto report rendering must happen only through the `report` Compose service
+  or an explicit Make target.
+- Heavy optimization must never run implicitly from the `report` service.
+- Rendered report HTML must not be committed.
 - Do not reintroduce QuantConnect, Lean CLI, or any cloud dependency into the
   canonical reproduction path.
 - Do not add live downloads to the final reproduction path.

@@ -53,11 +53,11 @@ REQUIRED_TABLES = [
 missing = [str(path) for path in REQUIRED_TABLES if not path.exists()]
 if missing:
     raise FileNotFoundError(
-        "The final report cannot be rendered because required generated outputs are missing: "
-        + ", ".join(missing)
-        + ". Regenerate them with: make reproduce-report. If Quarto is not installed, run the "
-        + "pipeline commands documented in README.md and then render with quarto render "
-        + "reports/final_report.qmd."
+        "The final report cannot be rendered because required generated outputs are missing:\n- "
+        + "\n- ".join(missing)
+        + "\nRun the explicit prerequisite commands documented in README.md, then rerun "
+        + "`docker compose run --rm report`. Report rendering does not generate outputs or run "
+        + "optimization automatically."
     )
 
 
@@ -196,7 +196,7 @@ def safe_read_csv(path: Path, required: bool = False, **kwargs) -> pd.DataFrame:
     message = f"Report input not found: `{rel(path)}`."
     if required:
         raise FileNotFoundError(message)
-    display(Markdown(f"> **Missing optional table.** {message} Regenerate outputs with `make reproduce-report`."))
+    display(Markdown(f"> **Missing optional table.** {message} Run the relevant explicit pipeline command documented in README.md."))
     return pd.DataFrame()
 
 
@@ -206,7 +206,7 @@ def safe_image(path: Path, caption: str) -> None:
     else:
         display(Markdown(
             f"> **Missing chart.** `{rel(path)}` was not generated. "
-            "Regenerate outputs with `make reproduce-report`."
+            "Run the relevant explicit pipeline command documented in README.md."
         ))
 
 

@@ -29,4 +29,4 @@ COPY . .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -e ".[dev,report]"
 
-CMD ["sh", "scripts/docker_render_report.sh"]
+CMD ["python", "-m", "strategy_development.local_implementation.reproduce"]

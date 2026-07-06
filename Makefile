@@ -1,4 +1,4 @@
-.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report report-clean report-quarto reproduce reproduce-report final-portfolio docker-build docker-test docker-reproduce clean
+.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report report-clean report-quarto reproduce reproduce-report final-portfolio docker-build docker-test docker-reproduce docker-report docker-reproduce-report-full clean
 
 PYTHON ?= python3
 PIP ?= pip
@@ -59,7 +59,7 @@ report-clean:  ## Remove generated Quarto report artifacts only
 [shutil.rmtree(path, ignore_errors=True) for pattern in ['*_cache', '*_files'] for path in (root / 'reports').glob(pattern) if path.is_dir()]"
 
 reproduce:  ## Run the deterministic research pipeline locally
-	$(PYTHON) -m strategy_development.local_implementation.reproduce
+	python -m strategy_development.local_implementation.reproduce
 
 reproduce-report:  ## Regenerate report inputs with practical deterministic commands, then render Quarto
 	$(PYTHON) -m preprocessing.materialize_processed_data
@@ -80,8 +80,11 @@ docker-test:  ## Run tests inside Docker
 docker-reproduce:  ## Build the image and run the deterministic pipeline in Docker
 	docker compose up --build reproduce
 
-docker-report:  ## Build the image and render the full Quarto report in Docker
-	docker compose up --build report
+docker-report:  ## Render the final report from existing outputs inside Docker
+	docker compose run --rm report
+
+docker-reproduce-report-full:  ## Optionally regenerate all report inputs (potentially slow), then render
+	docker compose run --rm reproduce-report-full
 
 clean:  ## Remove caches, build products, and generated outputs
 	$(PYTHON) -c "from pathlib import Path; import shutil; \
