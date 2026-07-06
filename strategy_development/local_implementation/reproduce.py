@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 import random
-import shutil
 import subprocess
 import sys
 from importlib import metadata
@@ -74,12 +73,10 @@ def _git_commit_hash() -> str | None:
     return result.stdout.strip() or None
 
 
-def _clean_output_dir(output_dir: Path) -> None:
+def _prepare_output_dirs(output_dir: Path) -> None:
+    """Create directories owned by reproduce without removing other artifacts."""
     for relative_dir in ["tables", "figures", "report"]:
-        target_dir = output_dir / relative_dir
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
-        target_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / relative_dir).mkdir(parents=True, exist_ok=True)
 
 
 def _load_reproduction_data() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -405,7 +402,7 @@ def run_reproduction(
     np.random.seed(0)
 
     output_dir = Path(output_dir)
-    _clean_output_dir(output_dir)
+    _prepare_output_dirs(output_dir)
 
     daily_data, minute_data = _load_reproduction_data()
     results = _run_strategies(daily_data, minute_data, cost_config)

@@ -102,6 +102,12 @@ If Docker is available, keep the Docker command passing too.
   presentation-only summaries.
 - The canonical Docker run should leave the expected outputs on the host in the
   bind-mounted `outputs/` directory and exit code `0`.
+- Local and Docker lightweight reproduction may overwrite only its own named
+  artifacts. It must never clean output directories or remove fixed-15-minute,
+  optimization, final-portfolio, or other existing report inputs.
+- The `report` Compose service renders Quarto from existing outputs only. Missing
+  inputs must be restored or generated with an explicit stage; heavy report
+  regeneration is optional and never automatic.
 - The fixed 15-minute baseline runner should emit:
   `fixed_15m_strategy_summary.csv`,
   `fixed_15m_strategy_returns.csv`,

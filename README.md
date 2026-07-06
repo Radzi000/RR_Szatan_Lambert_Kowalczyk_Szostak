@@ -30,7 +30,9 @@ docker compose up --build reproduce
 ```
 
 The bind-mounted `outputs/` directory receives the lightweight reproduction
-artifacts.
+artifacts. This command only overwrites files owned by the lightweight
+reproduction pipeline; it does not clean `outputs/` or remove fixed-15-minute,
+optimization, final-portfolio, or other report inputs already present.
 
 ## Workflow 3: Render The Final Report Inside Docker
 
@@ -54,6 +56,11 @@ python -m strategy_development.local_implementation.reproduce
 python -m strategy_development.local_implementation.run_fixed_15m_experiments
 python -m strategy_development.local_implementation.optimization.run_all_optimizations
 ```
+
+If these report inputs are missing, run the applicable explicit generation
+command above or restore the authoritative generated files from Git. Heavy
+report-input regeneration is optional and never starts from `reproduce` or the
+`report` service.
 
 Some optional portfolio sections additionally use artifacts from:
 

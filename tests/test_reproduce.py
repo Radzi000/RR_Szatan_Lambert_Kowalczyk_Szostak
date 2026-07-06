@@ -26,7 +26,22 @@ def test_committed_data_loads_without_downloads() -> None:
 
 
 def test_reproduction_pipeline_generates_stable_outputs(tmp_path: Path) -> None:
+    report_input = tmp_path / "tables" / "optimization_search_results.csv"
+    report_figure = tmp_path / "figures" / "optimization_convergence.png"
+    portfolio_output = tmp_path / "report" / "final_portfolio_report.md"
+    for path, content in [
+        (report_input, b"authoritative,optimization\n1,2\n"),
+        (report_figure, b"existing report figure"),
+        (portfolio_output, b"existing portfolio report"),
+    ]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
     run_reproduction(output_dir=tmp_path, generate_report=True)
+
+    assert report_input.read_bytes() == b"authoritative,optimization\n1,2\n"
+    assert report_figure.read_bytes() == b"existing report figure"
+    assert portfolio_output.read_bytes() == b"existing portfolio report"
 
     expected_paths = [
         tmp_path / "tables" / "strategy_summary.csv",

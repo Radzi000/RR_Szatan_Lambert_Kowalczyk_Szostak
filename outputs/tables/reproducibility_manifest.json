@@ -4,9 +4,9 @@
     "intraday-momentum": "0.1.0",
     "numpy": "2.4.6",
     "pandas": "3.0.3",
-    "matplotlib": "3.10.9",
+    "matplotlib": "3.11.0",
     "seaborn": "0.13.2",
-    "yfinance": "1.4.0"
+    "yfinance": "1.5.1"
   },
   "git_commit_hash": null,
   "run_command": "python -m strategy_development.local_implementation.reproduce",
