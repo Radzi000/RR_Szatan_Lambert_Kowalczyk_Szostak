@@ -205,6 +205,8 @@ make docker-reproduce
 
 make docker-report
 
+make docker-publish
+
 make docker-reproduce-report-full
 ```
 
@@ -215,29 +217,35 @@ The last command performs a complete regeneration of optimization outputs and ma
 # Maintainer Notes (Docker Hub)
 
 The following commands are only required when publishing a new Docker image.
-
-Build the image:
-
-```bash
-docker build -t intraday-momentum-repro .
-```
-
-Tag the image:
+Create or select a Buildx builder:
 
 ```bash
-docker tag intraday-momentum-repro radek1715/intraday-momentum-repro:latest
+docker buildx create --use --name rr-builder || docker buildx use rr-builder
 ```
 
-Push to Docker Hub:
+Build and push both supported platforms under one Docker Hub tag:
 
 ```bash
-docker push radek1715/intraday-momentum-repro:latest
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t radek1715/intraday-momentum-repro:latest \
+  --push .
 ```
+
+The equivalent convenience target is:
+
+```bash
+make docker-publish
+```
+
+Buildx creates a multi-architecture manifest under the single tag. Docker then
+selects the correct image automatically: Intel and AMD machines receive the
+`linux/amd64` image, while Apple Silicon Macs receive the `linux/arm64` image.
 
 Verify the published image:
 
 ```bash
-docker rmi radek1715/intraday-momentum-repro:latest
+docker manifest inspect radek1715/intraday-momentum-repro:latest
 
 docker pull radek1715/intraday-momentum-repro:latest
 
@@ -245,6 +253,9 @@ docker inspect radek1715/intraday-momentum-repro:latest --format "{{json .Config
 
 docker run --rm radek1715/intraday-momentum-repro:latest
 ```
+
+The manifest output must contain both `linux/amd64` and `linux/arm64`. Neither
+platform should require an explicit `--platform` option when pulling or running.
 
 The default command of the published image must always be:
 

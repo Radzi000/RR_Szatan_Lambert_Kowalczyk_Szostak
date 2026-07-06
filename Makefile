@@ -1,7 +1,9 @@
-.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report report-clean report-quarto reproduce reproduce-report final-portfolio docker-build docker-test docker-reproduce docker-report docker-reproduce-report-full clean
+.PHONY: help install dev lint format test data-manifest splits preprocess fixed-15m optimize optimize-smoke results report report-clean report-quarto reproduce reproduce-report final-portfolio docker-build docker-publish docker-test docker-reproduce docker-report docker-reproduce-report-full clean
 
 PYTHON ?= python3
 PIP ?= pip
+DOCKER_IMAGE ?= radek1715/intraday-momentum-repro:latest
+DOCKER_PLATFORMS ?= linux/amd64,linux/arm64
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -73,6 +75,9 @@ final-portfolio:  ## Run final portfolio construction: grid search, figures, and
 
 docker-build:  ## Build the Docker image
 	docker build -t intraday-momentum-repro .
+
+docker-publish:  ## Build and push the multi-platform Docker Hub image
+	docker buildx build --platform $(DOCKER_PLATFORMS) -t $(DOCKER_IMAGE) --push .
 
 docker-test:  ## Run tests inside Docker
 	docker compose run --rm test
