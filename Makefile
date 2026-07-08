@@ -85,8 +85,8 @@ docker-test:  ## Run tests inside Docker
 docker-reproduce:  ## Build the image and run the deterministic pipeline in Docker
 	docker compose up --build reproduce
 
-docker-report:  ## Render the final report from existing outputs inside Docker
-	docker compose run --rm report
+docker-report:  ## Render the final report from committed outputs with the image default command
+	docker run --rm -v "$(CURDIR)/reports:/app/reports" $(DOCKER_IMAGE)
 
 docker-reproduce-report-full:  ## Optionally regenerate all report inputs (potentially slow), then render
 	docker compose run --rm reproduce-report-full

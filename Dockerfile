@@ -29,4 +29,4 @@ COPY . .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -e ".[dev,report]"
 
-CMD ["python", "-m", "strategy_development.local_implementation.reproduce"]
+CMD ["/bin/sh", "scripts/render_report.sh"]

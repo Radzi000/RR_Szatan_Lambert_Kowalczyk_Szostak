@@ -18,55 +18,33 @@ All experiments use committed offline OHLCV datasets. No live downloads are perf
 
 ---
 
-# Workflow 0 - running just the raport
-
-1. Run reproduce
-```bash
-docker compose up --build reproduce
-```
-
-2. Check if all the necessary files are in place
-```bash
-python scripts/check_report_inputs.py
-```
-
-3. Generate Quarto (should have "all required generated outputs exist")
-```bash
-docker compose run --rm report
-```
-
-4. Open raport
-```bash
-start reports\final_report.html
-```
----
-
-
----
-
 # Workflow 1 – Run the prebuilt Docker image (recommended)
 
-The fastest way to verify reproducibility is to use the prebuilt Docker image.
+The prebuilt image contains the committed optimization outputs and renders the
+final Quarto report. It does not run preprocessing, training, fixed experiments,
+NES, CMA-ES, or any other optimization.
 
 ```bash
 docker pull radek1715/intraday-momentum-repro:latest
-docker run --rm radek1715/intraday-momentum-repro:latest
+docker run --rm \
+  -v "${PWD}/reports:/app/reports" \
+  radek1715/intraday-momentum-repro:latest
 ```
 
-The image executes exactly:
+Windows PowerShell uses the equivalent bind mount:
 
-```bash
-python -m strategy_development.local_implementation.reproduce
+```powershell
+docker run --rm `
+  -v "${PWD}/reports:/app/reports" `
+  radek1715/intraday-momentum-repro:latest
 ```
 
-This command:
+The image first runs `python scripts/check_report_inputs.py`. If preflight
+passes, it runs `quarto render reports/final_report.qmd`. The bind mount exports
+the generated `reports/final_report.html` directly to the host directory.
 
-- reproduces the baseline results,
-- generates deterministic outputs,
-- does **not** render Quarto,
-- does **not** start Jupyter,
-- does **not** run optimization,
-- does **not** download any data.
+If an input is missing, preflight lists the missing files and the explicit
+commands that generate them, then exits without regenerating anything.
 
 ---
 
@@ -152,7 +130,7 @@ python -m final_portfolio.run_report
 Heavy optimization is **never executed automatically** by either:
 
 ```bash
-docker run
+docker run --rm -v "${PWD}/reports:/app/reports" radek1715/intraday-momentum-repro:latest
 ```
 
 or
@@ -278,17 +256,23 @@ docker pull radek1715/intraday-momentum-repro:latest
 
 docker inspect radek1715/intraday-momentum-repro:latest --format "{{json .Config.Cmd}}"
 
-docker run --rm radek1715/intraday-momentum-repro:latest
+docker run --rm \
+  -v "${PWD}/reports:/app/reports" \
+  radek1715/intraday-momentum-repro:latest
 ```
 
 The manifest output must contain both `linux/amd64` and `linux/arm64`. Neither
 platform should require an explicit `--platform` option when pulling or running.
 
-The default command of the published image must always be:
+The default command of the published image must validate the committed report
+inputs and render:
 
 ```bash
-python -m strategy_development.local_implementation.reproduce
+reports/final_report.html
 ```
+
+The lightweight developer reproduction remains available through
+`docker compose up --build reproduce` and `make reproduce`.
 
 ---
 

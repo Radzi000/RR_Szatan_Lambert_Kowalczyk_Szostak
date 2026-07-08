@@ -9,6 +9,7 @@ author:
 date: last-modified
 format:
   html:
+    embed-resources: true
     toc: true
     toc-depth: 3
     number-sections: true

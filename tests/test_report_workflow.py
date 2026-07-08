@@ -25,9 +25,13 @@ def test_report_preflight_fails_before_quarto_with_actionable_commands(tmp_path:
     assert "No preprocessing, optimization" in result.stdout
 
 
-def test_docker_default_and_report_service_are_separate() -> None:
+def test_docker_default_renders_report_and_compose_keeps_reproduction() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    report_script = (ROOT / "scripts" / "render_report.sh").read_text(encoding="utf-8")
 
-    assert 'CMD ["python", "-m", "strategy_development.local_implementation.reproduce"]' in dockerfile
+    assert 'CMD ["/bin/sh", "scripts/render_report.sh"]' in dockerfile
+    assert "python scripts/check_report_inputs.py" in report_script
+    assert "quarto render reports/final_report.qmd" in report_script
+    assert "python -m strategy_development.local_implementation.reproduce" in compose
     assert "python scripts/check_report_inputs.py && quarto render reports/final_report.qmd" in compose
