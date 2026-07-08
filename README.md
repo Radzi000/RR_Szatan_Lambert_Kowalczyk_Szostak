@@ -15,6 +15,33 @@ The repository contains:
 
 All experiments use committed offline OHLCV datasets. No live downloads are performed in the canonical reproducibility pipeline.
 
+
+---
+
+# Workflow 0 - running just the raport
+
+1. Run reproduce
+```bash
+docker compose up --build reproduce
+```
+
+2. Check if all the necessary files are in place
+```bash
+python scripts/check_report_inputs.py
+```
+
+3. Generate Quarto (should have "all required generated outputs exist")
+```bash
+docker compose run --rm report
+```
+
+4. Open raport
+```bash
+start reports\final_report.html
+```
+---
+
+
 ---
 
 # Workflow 1 – Run the prebuilt Docker image (recommended)
