@@ -46,6 +46,25 @@ the generated `reports/final_report.html` directly to the host directory.
 If an input is missing, preflight lists the missing files and the explicit
 commands that generate them, then exits without regenerating anything.
 
+After the run, open the generated report in a browser. The command depends on
+your operating system:
+
+```bash
+# macOS
+open reports/final_report.html
+
+# Linux
+xdg-open reports/final_report.html
+```
+
+```powershell
+# Windows (PowerShell / CMD)
+start reports\final_report.html
+```
+
+On macOS and Linux use forward slashes (`/`); `start` and backslash paths work
+only on Windows.
+
 ---
 
 # Workflow 2 – Clone the repository and reproduce everything locally
